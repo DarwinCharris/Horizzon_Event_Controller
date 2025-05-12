@@ -120,6 +120,104 @@ export async function enviarFeedback({ userId, eventId, stars, comment }) {
 }
 
 //-------------------------------------------------EDIT-------------------------------------
+export async function editEventTrack({
+  id,
+  name,
+  description,
+  coverPath,
+  overlayPath,
+}) {
+  try {
+    const body = { id };
+
+    if (name !== undefined) body.name = name;
+    if (description !== undefined) body.description = description;
+
+    if (coverPath !== undefined) {
+      body.coverImageBase64 = await convertToBase64(coverPath);
+    }
+
+    if (overlayPath !== undefined) {
+      body.overlayImageBase64 = await convertToBase64(overlayPath);
+    }
+
+    const response = await fetch(`${API_BASE}/event-track-edit`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `${response.status}: ${errorText}` };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+export async function editEvent({
+  id,
+  event_track_id,
+  name,
+  description,
+  long_description,
+  speakers,
+  initial_date,
+  final_date,
+  location,
+  capacity,
+  available_seats,
+  coverPath,
+  cardPath,
+  event_track_name,
+}) {
+  try {
+    const body = { id };
+
+    if (event_track_id !== undefined) body.event_track_id = event_track_id;
+    if (name !== undefined) body.name = name;
+    if (description !== undefined) body.description = description;
+    if (long_description !== undefined)
+      body.long_description = long_description;
+    if (speakers !== undefined) body.speakers = JSON.stringify(speakers);
+    if (initial_date !== undefined) body.initial_date = initial_date;
+    if (final_date !== undefined) body.final_date = final_date;
+    if (location !== undefined) body.location = location;
+    if (capacity !== undefined) body.capacity = capacity;
+    if (available_seats !== undefined) body.available_seats = available_seats;
+    if (event_track_name !== undefined)
+      body.event_track_name = event_track_name;
+
+    if (coverPath !== undefined) {
+      body.cover_image = await convertToBase64(coverPath);
+    }
+
+    if (cardPath !== undefined) {
+      body.card_image = await convertToBase64(cardPath);
+    }
+
+    const response = await fetch(`${API_BASE}/event-edit`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `${response.status}: ${errorText}` };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
 
 //--------------------------------------------------DELETE-----------------------------------
 // Eliminar un feedback por ID
