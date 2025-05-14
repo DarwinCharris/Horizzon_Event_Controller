@@ -1,20 +1,32 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { AddEventScreen } from './src/screens/AddEventScreen';
+import { MyEventsScreen } from './src/screens/MyEventsScreen';
+
+const Stack = createStackNavigator();
+
+const screenOptions = {
+  headerShown: false,
+  transitionSpec: {
+    open: { animation: 'timing', config: { duration: 0 } },
+    close: { animation: 'timing', config: { duration: 0 } },
+  },
+  cardStyleInterpolator: () => ({}),
+};
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator 
+        initialRouteName="Home"
+        screenOptions={screenOptions}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="AddEvent" component={AddEventScreen} />
+        <Stack.Screen name="MyEvents" component={MyEventsScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
