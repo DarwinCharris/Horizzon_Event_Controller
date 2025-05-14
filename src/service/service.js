@@ -1,4 +1,4 @@
-import { convertToBase64 } from "./image_converter";
+import { convertToBase64 } from "../service/image_converter";
 import axios from "axios";
 
 const API_BASE = "https://horizzon-backend.onrender.com"; // Reemplaza con tu URL real
