@@ -3,6 +3,7 @@ import { View, Button, Image, StyleSheet } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { convertToBase64 } from "../../service/image_converter";
 
+//
 const ImageUploader = () => {
   //Esta función va a hacer que subas a tu galería
   const pickImage = async () => {
