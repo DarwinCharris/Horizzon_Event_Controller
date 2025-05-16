@@ -1,18 +1,16 @@
-import RNFS from "react-native-fs";
-import * as mime from "react-native-mime-types"; // Opcional para detectar tipo MIME
+// convertToBase64.js
+import * as FileSystem from "expo-file-system";
 
 export const convertToBase64 = async (uri) => {
   try {
-    const base64String = await RNFS.readFile(uri, "base64");
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
 
-    // Detectar tipo MIME (si no lo sabes puedes fijarlo a mano como 'image/jpeg')
-    const mimeType = mime.lookup(uri) || "image/jpeg";
-
-    // Agregar encabezado
-    const base64WithHeader = `data:${mimeType};base64,${base64String}`;
-    return base64WithHeader;
+    const extension = uri.split(".").pop();
+    return `data:image/${extension};base64,${base64}`;
   } catch (error) {
     console.error("Error al convertir a base64:", error);
-    throw error;
+    return null;
   }
 };

@@ -1,41 +1,49 @@
 import { convertToBase64 } from "../service/image_converter";
 import axios from "axios";
 
-const API_BASE = "https://horizzon-backend.onrender.com"; // Reemplaza con tu URL real
+const API_BASE = "https://horizzon-backend.onrender.com";
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Función genérica para manejar errores
+const handleRequest = async (requestFunc) => {
+  try {
+    const response = await requestFunc();
+    return { success: true, data: response.data };
+  } catch (error) {
+    const message = error.response
+      ? `Error ${error.response.status}: ${
+          error.response.data?.message || error.message
+        }`
+      : error.message;
+    return { success: false, error: message };
+  }
+};
 
 //---------------------------------------------------CREATE-----------------------------------
+// Crear Event Track
 export const createEventTrack = async (
   name,
   description,
   coverPath,
   overlayPath
 ) => {
-  try {
-    const coverBase64 = await convertToBase64(coverPath);
-    const overlayBase64 = await convertToBase64(overlayPath);
+  const data = {
+    name,
+    description,
+    coverImageBase64: await convertToBase64(coverPath),
+    overlayImageBase64: await convertToBase64(overlayPath),
+  };
 
-    const data = {
-      name,
-      description,
-      coverImageBase64: coverBase64,
-      overlayImageBase64: overlayBase64,
-    };
-
-    const response = await axios.post(`${API_BASE}/event-track`, data);
-
-    return {
-      success: true,
-      id: response.data.id,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.response?.data || error.message,
-    };
-  }
+  return handleRequest(() => api.post("/event-track", data));
 };
 
-export async function createEvent({
+// Crear Evento
+export const createEvent = async ({
   trackId,
   eventTrackName,
   name,
@@ -49,117 +57,61 @@ export async function createEvent({
   seats,
   coverPath,
   cardPath,
-}) {
-  try {
-    const coverBase64 = await convertToBase64(coverPath);
-    const cardBase64 = await convertToBase64(cardPath);
+}) => {
+  const data = {
+    eventTrackId: trackId,
+    name,
+    description,
+    longDescription,
+    speakers: JSON.stringify(speakers),
+    initialDate: start,
+    finalDate: end,
+    location,
+    capacity,
+    availableSeats: seats,
+    eventTrackName,
+    coverImageBase64: await convertToBase64(coverPath),
+    cardImageBase64: await convertToBase64(cardPath),
+  };
 
-    const data = {
-      eventTrackId: trackId,
-      name,
-      description,
-      longDescription,
-      speakers: JSON.stringify(speakers),
-      initialDate: start,
-      finalDate: end,
-      location: location,
-      capacity,
-      availableSeats: seats,
-      eventTrackName,
-      coverImageBase64: coverBase64,
-      cardImageBase64: cardBase64,
-    };
+  return handleRequest(() => api.post("/event", data));
+};
 
-    const response = await fetch(`${API_BASE}/event`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
+// Enviar Feedback
+export const enviarFeedback = async ({ userId, eventId, stars, comment }) => {
+  const payload = {
+    userId,
+    eventId,
+    stars,
+    comment,
+  };
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      return { success: false, error: response.status + ": " + errorBody };
-    }
-
-    const responseData = await response.json();
-    return { success: true, id: responseData.id };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
-
-export async function enviarFeedback({ userId, eventId, stars, comment }) {
-  try {
-    const payload = {
-      userId,
-      eventId,
-      stars,
-      comment,
-    };
-
-    const response = await fetch(`${API_BASE}/feedback`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      return { success: false, error: response.status + ": " + errorBody };
-    }
-
-    const responseData = await response.json();
-    return { success: true, id: responseData.id };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+  return handleRequest(() => api.post("/feedback", payload));
+};
 
 //-------------------------------------------------EDIT-------------------------------------
-export async function editEventTrack({
+// Editar un Event Track
+export const editEventTrack = async ({
   id,
   name,
   description,
   coverPath,
   overlayPath,
-}) {
-  try {
-    const body = { id };
+}) => {
+  const body = { id };
 
-    if (name !== undefined) body.name = name;
-    if (description !== undefined) body.description = description;
+  if (name !== undefined) body.name = name;
+  if (description !== undefined) body.description = description;
+  if (coverPath !== undefined)
+    body.coverImageBase64 = await convertToBase64(coverPath);
+  if (overlayPath !== undefined)
+    body.overlayImageBase64 = await convertToBase64(overlayPath);
 
-    if (coverPath !== undefined) {
-      body.coverImageBase64 = await convertToBase64(coverPath);
-    }
+  return handleRequest(() => api.post("/event-track-edit", body));
+};
 
-    if (overlayPath !== undefined) {
-      body.overlayImageBase64 = await convertToBase64(overlayPath);
-    }
-
-    const response = await fetch(`${API_BASE}/event-track-edit`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: `${response.status}: ${errorText}` };
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
-export async function editEvent({
+// Editar un Evento
+export const editEvent = async ({
   id,
   event_track_id,
   name,
@@ -174,175 +126,53 @@ export async function editEvent({
   coverPath,
   cardPath,
   event_track_name,
-}) {
-  try {
-    const body = { id };
+}) => {
+  const body = { id };
 
-    if (event_track_id !== undefined) body.event_track_id = event_track_id;
-    if (name !== undefined) body.name = name;
-    if (description !== undefined) body.description = description;
-    if (long_description !== undefined)
-      body.long_description = long_description;
-    if (speakers !== undefined) body.speakers = JSON.stringify(speakers);
-    if (initial_date !== undefined) body.initial_date = initial_date;
-    if (final_date !== undefined) body.final_date = final_date;
-    if (location !== undefined) body.location = location;
-    if (capacity !== undefined) body.capacity = capacity;
-    if (available_seats !== undefined) body.available_seats = available_seats;
-    if (event_track_name !== undefined)
-      body.event_track_name = event_track_name;
+  if (event_track_id !== undefined) body.event_track_id = event_track_id;
+  if (name !== undefined) body.name = name;
+  if (description !== undefined) body.description = description;
+  if (long_description !== undefined) body.long_description = long_description;
+  if (speakers !== undefined) body.speakers = JSON.stringify(speakers);
+  if (initial_date !== undefined) body.initial_date = initial_date;
+  if (final_date !== undefined) body.final_date = final_date;
+  if (location !== undefined) body.location = location;
+  if (capacity !== undefined) body.capacity = capacity;
+  if (available_seats !== undefined) body.available_seats = available_seats;
+  if (event_track_name !== undefined) body.event_track_name = event_track_name;
+  if (coverPath !== undefined)
+    body.cover_image = await convertToBase64(coverPath);
+  if (cardPath !== undefined) body.card_image = await convertToBase64(cardPath);
 
-    if (coverPath !== undefined) {
-      body.cover_image = await convertToBase64(coverPath);
-    }
-
-    if (cardPath !== undefined) {
-      body.card_image = await convertToBase64(cardPath);
-    }
-
-    const response = await fetch(`${API_BASE}/event-edit`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: `${response.status}: ${errorText}` };
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+  return handleRequest(() => api.post("/event-edit", body));
+};
 
 //--------------------------------------------------DELETE-----------------------------------
 // Eliminar un feedback por ID
-export async function deleteFeedback(feedbackId) {
-  try {
-    const response = await fetch(`${API_BASE}/delete-feedback/${feedbackId}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: response.status + ": " + errorText };
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const deleteFeedback = (feedbackId) =>
+  handleRequest(() => api.delete(`/delete-feedback/${feedbackId}`));
 
 // Eliminar un evento por ID (incluye feedbacks asociados)
-export async function deleteEvent(eventId) {
-  try {
-    const response = await fetch(`${API_BASE}/delete-event/${eventId}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: response.status + ": " + errorText };
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const deleteEvent = (eventId) =>
+  handleRequest(() => api.delete(`/delete-event/${eventId}`));
 
 // Eliminar un event track por ID (incluye eventos y feedbacks asociados)
-export async function deleteEventTrack(trackId) {
-  try {
-    const response = await fetch(`${API_BASE}/delete-event-track/${trackId}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: response.status + ": " + errorText };
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const deleteEventTrack = (trackId) =>
+  handleRequest(() => api.delete(`/delete-event-track/${trackId}`));
 
 //-------------------------------------------------GET-------------------------------------
-// Obtener todos los event tracks
-export async function getAllEventTracks() {
-  try {
-    const response = await fetch(`${API_BASE}/all-event-tracks`);
-    if (!response.ok) throw new Error(`Error ${response.status}`);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const getAllEventTracks = () =>
+  handleRequest(() => api.get("/all-event-tracks"));
 
-// Obtener todos los eventos
-export async function getAllEvents() {
-  try {
-    const response = await fetch(`${API_BASE}/all-events`);
-    if (!response.ok) throw new Error(`Error ${response.status}`);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const getAllEvents = () => handleRequest(() => api.get("/all-events"));
 
-// Obtener todos los feedbacks
-export async function getAllFeedbacks() {
-  try {
-    const response = await fetch(`${API_BASE}/all-feedbacks`);
-    if (!response.ok) throw new Error(`Error ${response.status}`);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const getAllFeedbacks = () =>
+  handleRequest(() => api.get("/all-feedbacks"));
 
-// Obtener un event track por ID (con eventos y feedbacks)
-export async function getEventTrackById(trackId) {
-  try {
-    const response = await fetch(`${API_BASE}/event-track-byid/${trackId}`);
-    if (!response.ok) throw new Error(`Error ${response.status}`);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const getEventTrackById = (trackId) =>
+  handleRequest(() => api.get(`/event-track-byid/${trackId}`));
 
-// Obtener un evento por ID (con feedbacks)
-export async function getEventById(eventId) {
-  try {
-    const response = await fetch(`${API_BASE}/event-byid/${eventId}`);
-    if (!response.ok) throw new Error(`Error ${response.status}`);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const getEventById = (eventId) =>
+  handleRequest(() => api.get(`/event-byid/${eventId}`));
 
-// Obtener todos los datos completos (event tracks, eventos, feedbacks)
-export async function getFullData() {
-  try {
-    const response = await fetch(`${API_BASE}/full-data`);
-    if (!response.ok) throw new Error(`Error ${response.status}`);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+export const getFullData = () => handleRequest(() => api.get("/full-data"));

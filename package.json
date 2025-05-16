@@ -2,6 +2,7 @@
   "name": "horizzon_event_management",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -18,6 +19,7 @@
     "expo-file-system": "^18.1.10",
     "expo-image-picker": "^16.1.4",
     "expo-status-bar": "~2.2.3",
+    "mime-types": "^3.0.1",
     "react": "19.0.0",
     "react-native": "0.79.2",
     "react-native-fs": "^2.20.0",
