@@ -14,11 +14,11 @@ export const TopNavBar = ({ title }) => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 40,
-    height: 90 + (StatusBar.currentHeight || 0),
+    height: 90,
     backgroundColor: '#8bd5fc',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: StatusBar.currentHeight,
   },
   title: {
     color: 'white',
