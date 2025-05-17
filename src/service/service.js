@@ -1,7 +1,7 @@
 import { convertToBase64 } from "../service/image_converter";
 import axios from "axios";
 
-const API_BASE = "https://horizzon-backend.onrender.com";
+const API_BASE = "https://horizzon-backend.onrender.com/full-data";
 const api = axios.create({
   baseURL: API_BASE,
   headers: {

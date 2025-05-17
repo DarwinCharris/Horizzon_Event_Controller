@@ -1,13 +1,22 @@
+// src/screens/AddEventScreen.js
 import React from 'react';
-import { View, Text } from 'react-native';
-import { ScreenLayout } from '../components/ScreenLayout';
+import { View, Text, StyleSheet } from 'react-native';
 
-export const AddEventScreen = ({ navigation }) => {
+const AddEventScreen = () => {
   return (
-    <ScreenLayout title="Agregar Evento" navigation={navigation} currentRoute="AddEvent">
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Formulario para agregar eventos</Text>
-      </View>
-    </ScreenLayout>
+    <View style={styles.container}>
+      <Text>Formulario para agregar eventos</Text>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  }
+});
+
+export default AddEventScreen; // Exportación por defecto
