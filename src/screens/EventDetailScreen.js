@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 const EventDetailScreen = ({ route, navigation }) => {
   const { eventData } = route.params;
 
-  // Función para formatear fecha y hora
   const formatDateTime = (dateString) => {
     if (!dateString) return 'No definido';
     const options = { 
@@ -17,158 +16,206 @@ const EventDetailScreen = ({ route, navigation }) => {
     };
     return new Date(dateString).toLocaleDateString('es-ES', options);
   };
-
-  // Función para renderizar expositores
-  const renderSpeakers = () => {
+const renderSpeakers = () => {
     if (!eventData.speakers || eventData.speakers.length === 0) {
-      return <Text style={styles.detailText}>No hay expositores registrados</Text>;
+        return <Text style={styles.detailText}>No hay expositores registrados</Text>;
     }
 
-    return eventData.speakers.map((speaker, index) => (
-      <View key={index} style={styles.speakerContainer}>
-        <Ionicons name="person" size={20} color="#6200ee" style={styles.speakerIcon} />
-        <View>
-          <Text style={styles.speakerName}>{speaker.name || 'Nombre no disponible'}</Text>
-          <Text style={styles.speakerTitle}>{speaker.title || 'Título no disponible'}</Text>
-        </View>
-      </View>
-    ));
-  };
+    const speakers = typeof eventData.speakers === 'string' 
+        ? JSON.parse(eventData.speakers) 
+        : eventData.speakers;
 
+    return speakers.map((speaker, index) => {
+        const speakerName = typeof speaker === 'string' ? speaker : speaker?.name;
+        if (!speakerName) return null;
+
+        return (
+            <View key={index} style={styles.speakerContainer}>
+                <Ionicons name="person" size={20} color="#8bd5fc" />
+                <Text style={styles.speakerName}>{speakerName}</Text>
+            </View>
+        );
+    });
+};
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
+      {/* Header con botón de regreso */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#6200ee" />
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>{eventData.name}</Text>
       </View>
 
-      <View style={styles.content}>
-        {/* Sección de información básica */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información del Evento</Text>
-          <Text style={styles.detailText}>{eventData.description || 'No hay descripción disponible'}</Text>
-          
-          {eventData.long_description && (
-            <Text style={[styles.detailText, { marginTop: 10 }]}>
-              {eventData.long_description}
-            </Text>
-          )}
-        </View>
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.content}>
+          {/* Sección de información básica */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Información del Evento</Text>
+            <Text style={styles.detailText}>{eventData.description || 'No hay descripción disponible'}</Text>
+            
+            {eventData.long_description && (
+              <Text style={[styles.detailText, { marginTop: 10 }]}>
+                {eventData.long_description}
+              </Text>
+            )}
+          </View>
 
-        {/* Sección de fecha y hora */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Fecha y Hora</Text>
-          <View style={styles.detailRow}>
-            <Ionicons name="calendar" size={20} color="#6200ee" style={styles.icon} />
-            <Text style={styles.detailText}>
-              {formatDateTime(eventData.initial_date)} - {formatDateTime(eventData.final_date)}
-            </Text>
+          {/* Sección de fecha y hora */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Fecha y Hora</Text>
+            <View style={styles.detailRow}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="calendar" size={20} color="#fff" />
+              </View>
+              <Text style={styles.detailText}>
+                {formatDateTime(eventData.initial_date)} - {formatDateTime(eventData.final_date)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Sección de ubicación */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Ubicación</Text>
+            <View style={styles.detailRow}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="location" size={20} color="#fff" />
+              </View>
+              <Text style={styles.detailText}>{eventData.location || 'Ubicación no especificada'}</Text>
+            </View>
+          </View>
+
+          {/* Sección de capacidad */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Asistencia</Text>
+            <View style={styles.detailRow}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="people" size={20} color="#fff" />
+              </View>
+              <Text style={styles.detailText}>
+                {eventData.available_seats} de {eventData.capacity} asientos disponibles
+              </Text>
+            </View>
+            <View style={styles.progressBar}>
+              <View style={[
+                styles.progressFill,
+                { 
+                  width: `${((eventData.capacity - eventData.available_seats) / eventData.capacity * 100)}%`,
+                  backgroundColor: eventData.available_seats < 10 ? '#FF5252' : '#4CAF50'
+                }
+              ]} />
+            </View>
+          </View>
+
+          {/* Sección de expositores */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Expositores</Text>
+            {renderSpeakers()}
+          </View>
+
+          {/* Sección de categoría */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Categoría</Text>
+            <View style={styles.detailRow}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="pricetag" size={20} color="#fff" />
+              </View>
+              <Text style={styles.detailText}>{eventData.trackName || 'Sin categoría'}</Text>
+            </View>
           </View>
         </View>
-
-        {/* Sección de ubicación */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ubicación</Text>
-          <View style={styles.detailRow}>
-            <Ionicons name="location" size={20} color="#6200ee" style={styles.icon} />
-            <Text style={styles.detailText}>{eventData.location || 'Ubicación no especificada'}</Text>
-          </View>
-        </View>
-
-        {/* Sección de capacidad */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Asistencia</Text>
-          <View style={styles.detailRow}>
-            <Ionicons name="people" size={20} color="#6200ee" style={styles.icon} />
-            <Text style={styles.detailText}>
-              {eventData.available_seats} de {eventData.capacity} asientos disponibles
-            </Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View style={[
-              styles.progressFill,
-              { 
-                width: `${((eventData.capacity - eventData.available_seats) / eventData.capacity * 100)}%`,
-                backgroundColor: eventData.available_seats < 10 ? '#FF5252' : '#4CAF50'
-              }
-            ]} />
-          </View>
-        </View>
-
-        {/* Sección de expositores */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Expositores</Text>
-          {renderSpeakers()}
-        </View>
-
-        {/* Sección de categoría */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categoría</Text>
-          <View style={styles.detailRow}>
-            <Ionicons name="pricetag" size={20} color="#6200ee" style={styles.icon} />
-            <Text style={styles.detailText}>{eventData.trackName || 'Sin categoría'}</Text>
-          </View>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+  scrollContainer: {
     flex: 1,
   },
+  header: {
+    backgroundColor: '#8bd5fc',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 50, // Aumentamos el padding horizontal
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 50,
+    zIndex: 10,
+    padding: 5,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 10,
+    flex: 1,
+    marginLeft: 30, // Añadimos margen izquierdo para la flecha
+    marginRight: 20, // Y margen derecho para balancear
+  },
   content: {
-    padding: 16,
+    padding: 20,
+    paddingTop: 10,
   },
   section: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 12,
+    padding: 18,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#8bd5fc',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#6200ee',
+    color: '#333',
     marginBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#8bd5fc',
+    paddingBottom: 5,
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 10,
   },
-  icon: {
-    marginRight: 10,
+  iconContainer: {
+    backgroundColor: '#8bd5fc',
+    borderRadius: 20,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   detailText: {
     fontSize: 16,
-    color: '#333',
+    color: '#555',
     lineHeight: 24,
     flex: 1,
   },
@@ -176,9 +223,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-    paddingLeft: 8,
   },
-  speakerIcon: {
+  speakerIconContainer: {
+    backgroundColor: '#8bd5fc',
+    borderRadius: 20,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   speakerName: {
@@ -191,16 +243,26 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   progressBar: {
-    height: 6,
-    backgroundColor: '#eee',
-    borderRadius: 3,
-    marginTop: 8,
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginTop: 10,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
+      speakerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    speakerName: {
+        fontSize: 16,
+        marginLeft: 10,
+        color: '#333',
+    },
 });
 
 export default EventDetailScreen;

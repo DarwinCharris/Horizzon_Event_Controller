@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, FlatList, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { getAllEvents } from '../service/service';
 
 export default function HomeScreen({ navigation }) {
   const [events, setEvents] = useState([]);
@@ -7,42 +9,62 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchEvents = useCallback(async () => {
+const fetchEvents = useCallback(async () => {
     try {
-      setError(null);
-      const startTime = Date.now();
-      
-      const response = await fetch('https://horizzon-backend.onrender.com/full-data', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-      });
+        setError(null);
+        setRefreshing(true);
+        
+        const response = await getAllEvents();
+        
+        if (!response.success) {
+            throw new Error(response.error);
+        }
 
-      if (!response.ok) {
-        throw new Error(`Error HTTP! estado: ${response.status}`);
-      }
+        const processedEvents = response.data.map(event => {
+            // Procesar speakers para asegurar consistencia
+            let speakers = [];
+            try {
+                if (event.speakers) {
+                    // Si es string, parsear
+                    if (typeof event.speakers === 'string') {
+                        speakers = JSON.parse(event.speakers);
+                    } else {
+                        speakers = event.speakers;
+                    }
+                    
+                    // Convertir a formato objeto si es necesario
+                    if (Array.isArray(speakers)) {
+                        speakers = speakers.map(speaker => {
+                            return typeof speaker === 'string' 
+                                ? { name: speaker, title: '' } 
+                                : speaker;
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing speakers:', error);
+                speakers = [];
+            }
 
-      const data = await response.json();
-      
-      const processedEvents = data.map(event => ({
-        ...event,
-        formattedStartDate: formatDate(event.initial_date),
-        formattedEndDate: formatDate(event.final_date),
-        trackName: event.event_track_name || 'Sin categoría'
-      }));
+            return {
+                ...event,
+                speakers: speakers || [],
+                formattedStartDate: formatDate(event.initial_date),
+                formattedEndDate: formatDate(event.final_date),
+                trackName: event.event_track_name || 'Sin categoría',
+                available_seats: event.available_seats || 0
+            };
+        });
 
-      setEvents(processedEvents);
-      console.log(`Datos cargados en ${Date.now() - startTime}ms`);
+        setEvents(processedEvents);
     } catch (error) {
-      console.error('Error al cargar eventos:', error);
-      setError(error.message);
+        console.error('Error al cargar eventos:', error);
+        setError(error.message);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+        setLoading(false);
+        setRefreshing(false);
     }
-  }, []);
+}, []);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Fecha no definida';
@@ -51,50 +73,96 @@ export default function HomeScreen({ navigation }) {
   };
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
     fetchEvents();
   }, [fetchEvents]);
 
   useEffect(() => {
-    const loadData = async () => {
-      await fetchEvents();
-    };
-    loadData();
+    fetchEvents();
   }, [fetchEvents]);
 
-  const renderEventItem = useCallback(({ item }) => (
-    <TouchableOpacity 
-      style={styles.eventCard}
-      onPress={() => navigation.navigate('EventDetail', { 
-        eventId: item.id,
-        eventData: item 
-      })}
-    >
-      <View style={styles.eventInfo}>
-        <Text style={styles.eventTitle} numberOfLines={1}>{item.name}</Text>
-        <View style={styles.eventMeta}>
-          <Text style={styles.eventTrack} numberOfLines={1}>{item.trackName}</Text>
-          <Text style={styles.eventDate} numberOfLines={1}>
-            {item.formattedStartDate} - {item.formattedEndDate}
-          </Text>
-        </View>
-        <View style={styles.eventFooter}>
-          <Text style={styles.eventLocation} numberOfLines={1}>📍 {item.location || 'Ubicación no definida'}</Text>
-          <Text style={[
-            styles.eventSeats,
-            item.available_seats < 10 && { color: '#FF5252' }
-          ]}>
-            {item.available_seats || 0} asientos
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  ), []);
+const renderEventItem = useCallback(({ item }) => {
+    // Función para procesar los expositores
+    const getSpeakerNames = (speakers) => {
+        if (!speakers) return [];
+        
+        try {
+            const parsed = typeof speakers === 'string' ? JSON.parse(speakers) : speakers;
+            if (!Array.isArray(parsed)) return [];
+            
+            return parsed.map(speaker => {
+                // Solo extraemos el nombre sin título
+                return typeof speaker === 'string' ? speaker : speaker?.name || '';
+            }).filter(name => name.trim());
+        } catch (error) {
+            console.error('Error parsing speakers:', error);
+            return [];
+        }
+    };
+
+    const speakerNames = getSpeakerNames(item.speakers);
+
+    return (
+        <TouchableOpacity 
+            style={styles.eventCard}
+            onPress={() => navigation.navigate('EventDetail', { 
+                eventId: item.id,
+                eventData: item 
+            })}
+            activeOpacity={0.8}
+        >
+            <View style={styles.eventInfo}>
+                <Text style={styles.eventTitle} numberOfLines={2}>{item.name}</Text>
+                
+            {speakerNames.length > 0 && (
+                <View style={styles.speakersContainer}>
+                    <Ionicons name="people" size={16} color="#8bd5fc" />
+                    <Text style={styles.speakersText}>
+                        {speakerNames.join(', ')}
+                    </Text>
+                </View>
+            )}
+
+                <View style={styles.eventMeta}>
+                    <View style={styles.trackBadge}>
+                        <Text style={styles.eventTrack} numberOfLines={1}>
+                            {item.trackName || 'Sin categoría'}
+                        </Text>
+                    </View>
+                    <View style={styles.dateContainer}>
+                        <Ionicons name="calendar" size={16} color="#8bd5fc" />
+                        <Text style={styles.eventDate} numberOfLines={1}>
+                            {item.formattedStartDate} - {item.formattedEndDate}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={styles.eventFooter}>
+                    <View style={styles.locationContainer}>
+                        <Ionicons name="location" size={16} color="#8bd5fc" />
+                        <Text style={styles.eventLocation} numberOfLines={1}>
+                            {item.location || 'Ubicación no definida'}
+                        </Text>
+                    </View>
+                    <View style={[
+                        styles.seatsBadge,
+                        item.available_seats < 10 && styles.lowSeats
+                    ]}>
+                        <Text style={styles.eventSeats}>
+                            {item.available_seats} asientos
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+}, [navigation]);
+
+
 
   if (loading && events.length === 0) {
     return (
-      <View style={[styles.loadingContainer, { marginTop: 0 }]}>
-        <ActivityIndicator size="large" color="#6200ee" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8bd5fc" />
         <Text style={styles.loadingText}>Cargando eventos...</Text>
       </View>
     );
@@ -102,7 +170,8 @@ export default function HomeScreen({ navigation }) {
 
   if (error) {
     return (
-      <View style={[styles.errorContainer, { marginTop: 0 }]}>
+      <View style={styles.errorContainer}>
+        <Ionicons name="warning" size={48} color="#FF5252" style={styles.errorIcon} />
         <Text style={styles.errorText}>Error al cargar los eventos</Text>
         <Text style={styles.errorDetail}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchEvents}>
@@ -113,27 +182,24 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <View style={[styles.container, { marginBottom: 0 }]}>
+    <View style={styles.container}>
       <FlatList
         data={events}
         renderItem={renderEventItem}
         keyExtractor={item => item.id.toString()}
-        contentContainerStyle={[styles.listContainer, { paddingBottom: 20 }]}
-        initialNumToRender={5}
-        maxToRenderPerBatch={5}
-        windowSize={10}
-        updateCellsBatchingPeriod={50}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#6200ee']}
-            tintColor="#6200ee"
-            progressViewOffset={90} // Ajustado para el TopNavBar
+            colors={['#8bd5fc']}
+            tintColor="#8bd5fc"
+            progressBackgroundColor="#ffffff"
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
+            <Ionicons name="calendar" size={48} color="#8bd5fc" style={styles.emptyIcon} />
             <Text style={styles.emptyText}>No hay eventos disponibles</Text>
             <TouchableOpacity style={styles.refreshButton} onPress={fetchEvents}>
               <Text style={styles.refreshButtonText}>Actualizar</Text>
@@ -148,78 +214,108 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   loadingText: {
-    marginTop: 10,
-    color: '#6200ee',
+    marginTop: 16,
+    color: '#8bd5fc',
+    fontSize: 16,
+    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+    padding: 24,
+    backgroundColor: '#f8f9fa',
+  },
+  errorIcon: {
+    marginBottom: 16,
   },
   errorText: {
-    fontSize: 18,
+    fontSize: 20,
     color: '#FF5252',
-    marginBottom: 10,
+    marginBottom: 8,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   errorDetail: {
     color: '#666',
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
+    lineHeight: 20,
   },
   retryButton: {
-    backgroundColor: '#6200ee',
-    padding: 12,
-    borderRadius: 6,
+    backgroundColor: '#8bd5fc',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    shadowColor: '#8bd5fc',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   retryButtonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   listContainer: {
-    padding: 10,
-    paddingTop: 10, // Añadido espacio superior
+    padding: 16,
+    paddingTop: 8,
   },
   eventCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    borderRadius: 14,
+    marginBottom: 16,
+    shadowColor: '#8bd5fc',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
     overflow: 'hidden',
   },
   eventInfo: {
-    padding: 16,
+    padding: 18,
   },
   eventTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
     color: '#333',
   },
   eventMeta: {
-    marginBottom: 12,
+    marginBottom: 14,
+  },
+  trackBadge: {
+    backgroundColor: '#e6f6fe',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   eventTrack: {
-    color: '#6200ee',
+    color: '#0077b6',
     fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 14,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calendarIcon: {
+    marginRight: 6,
   },
   eventDate: {
-    color: '#666',
+    color: '#555',
     fontSize: 14,
   },
   eventFooter: {
@@ -227,35 +323,72 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  eventLocation: {
-    color: '#666',
-    fontSize: 14,
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     marginRight: 10,
+  },
+  eventLocation: {
+    color: '#555',
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  seatsBadge: {
+    backgroundColor: '#e6f6fe',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  lowSeats: {
+    backgroundColor: '#ffebee',
   },
   eventSeats: {
     fontWeight: '600',
     color: '#4CAF50',
+    fontSize: 14,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    padding: 24,
+  },
+  emptyIcon: {
+    marginBottom: 16,
+    opacity: 0.7,
   },
   emptyText: {
     textAlign: 'center',
-    marginBottom: 20,
-    color: '#666',
+    marginBottom: 24,
+    color: '#555',
     fontSize: 16,
+    lineHeight: 24,
   },
   refreshButton: {
-    backgroundColor: '#6200ee',
-    padding: 12,
-    borderRadius: 6,
+    backgroundColor: '#8bd5fc',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    shadowColor: '#8bd5fc',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   refreshButtonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
+    speakersContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    speakersText: {
+        color: '#555',
+        fontSize: 14,
+        marginLeft: 6,
+    },
 });
