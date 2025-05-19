@@ -1,6 +1,7 @@
 import { convertToBase64 } from "../service/image_converter";
 import axios from "axios";
 
+
 const API_BASE = "https://horizzon-backend.onrender.com";
 const api = axios.create({
   baseURL: API_BASE,
@@ -175,3 +176,43 @@ export const getEventById = (eventId) =>
   handleRequest(() => api.get(`/event-byid/${eventId}`));
 
 export const getFullData = () => handleRequest(() => api.get("/full-data"));
+
+//-------------------------------------------------USER EVENTS-------------------------------------
+// Add event to user's events
+export const addToMyEvents = async (eventId) => {
+  try {
+    const user = await getUserData();
+    if (!user) throw new Error("User not authenticated");
+    
+    const payload = {
+      userId: user.id,
+      eventId: eventId
+    };
+    
+    return handleRequest(() => api.post("/user/events", payload));
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Check if event is in user's events
+export const checkIfEventInMyEvents = async (userId, eventId) => {
+  return handleRequest(() => api.get(`/user/events/check?userId=${userId}&eventId=${eventId}`));
+};
+
+// Get all user's events
+export const getUserEvents = async (userId) => {
+  return handleRequest(() => api.get(`/user/events/${userId}`));
+};
+
+// Remove event from user's events
+export const removeFromMyEvents = async (eventId) => {
+  try {
+    const user = await getUserData();
+    if (!user) throw new Error("User not authenticated");
+    
+    return handleRequest(() => api.delete(`/user/events/${user.id}/${eventId}`));
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
