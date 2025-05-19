@@ -80,7 +80,6 @@ export const createEvent = async ({
 // Enviar Feedback
 export const enviarFeedback = async ({ userId, eventId, stars, comment }) => {
   const payload = {
-    userId,
     eventId,
     stars,
     comment,
