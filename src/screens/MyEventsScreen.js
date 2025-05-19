@@ -3,12 +3,13 @@ import { View, Text, StyleSheet } from "react-native";
 import ImageUploader from "../components/componente_de_prueba/tomar_img";
 import ImageUriPicker from "../components/componente_de_prueba/uir";
 import CreateEventTrackForm from "../components/componente_de_prueba/formulario";
+import CreateEventForm from "../components/componente_de_prueba/eventform";
 export const MyEventsScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Mis Eventos</Text>
       <View style={styles.content}>
-        <CreateEventTrackForm />
+        <CreateEventForm />
       </View>
     </View>
   );
