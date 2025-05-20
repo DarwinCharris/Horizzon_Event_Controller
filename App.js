@@ -7,10 +7,11 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 // Importa tus componentes correctamente
 import HomeScreen from './src/screens/HomeScreen';
 import AddEventScreen from './src/screens/AddEventScreen';
+import EventTrackScreen from './src/screens/EventTrackScreen';
 import MyEventsScreen from './src/screens/MyEventsScreen';
 import EventDetailScreen from './src/screens/EventDetailScreen';
 import { TopNavBar } from './src/components/TopNavBar';
-
+import EventTrackDetailScreen from './src/screens/EventTrackDetailScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -29,6 +30,8 @@ const MainNavigator = () => {
               return <MaterialIcons name="add-circle" size={size} color={color} />;
             } else if (route.name === 'MyEvents') {
               return <MaterialIcons name="event" size={size} color={color} />;
+            } else if (route.name === 'EventTrack') {
+              return <MaterialIcons name="timeline" size={size} color={color} />;
             }
           },
           tabBarActiveTintColor: 'white',
@@ -53,6 +56,10 @@ const MainNavigator = () => {
           name="MyEvents" 
           component={MyEventsScreen} 
         />
+        <Tab.Screen 
+          name="EventTrack" 
+          component={EventTrackScreen} 
+        />
       </Tab.Navigator>
     </>
   );
@@ -74,6 +81,14 @@ export default function App() {
         <Stack.Screen 
           name="EventDetail" 
           component={EventDetailScreen} 
+        />
+        <Stack.Screen 
+          name="EventTrackDetail" 
+          component={EventTrackDetailScreen} 
+          options={({ route }) => ({ 
+            title: route.params.trackName || 'Detalle de Línea',
+            headerBackTitle: 'Atrás'
+          })}
         />
       </Stack.Navigator>
     </NavigationContainer>
