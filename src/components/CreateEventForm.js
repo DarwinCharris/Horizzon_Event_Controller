@@ -3,7 +3,10 @@ import { View, Text, TextInput, Button, Alert, StyleSheet, ScrollView } from 're
 import * as ImagePicker from 'expo-image-picker';
 import { createEvent } from '../service/service';
 
-const CreateEventForm = ({ navigation, onEventCreated }) => {
+const CreateEventForm = ({ navigation, route }) => {
+  // Obtén la función de actualización de los parámetros de navegación
+  const { refreshEvents } = route.params || {};
+
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -15,7 +18,7 @@ const CreateEventForm = ({ navigation, onEventCreated }) => {
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images, // Corregido aquí
       quality: 0.5,
     });
 
@@ -30,26 +33,36 @@ const CreateEventForm = ({ navigation, onEventCreated }) => {
       return;
     }
 
-    const response = await createEvent({
-      trackId: parseInt(form.trackId),
-      name: form.name,
-      description: form.description,
-      start: form.start,
-      end: form.end,
-      coverPath: form.coverImage?.uri,
-      // Campos adicionales con valores por defecto:
-      speakers: [],
-      capacity: 100,
-      seats: 100,
-      cardPath: form.coverImage?.uri, // Misma imagen para card
-    });
+    try {
+      const response = await createEvent({
+        trackId: parseInt(form.trackId),
+        name: form.name,
+        description: form.description,
+        start: form.start,
+        end: form.end,
+        coverPath: form.coverImage?.uri,
+        speakers: [],
+        capacity: 100,
+        seats: 100,
+        cardPath: form.coverImage?.uri,
+      });
 
-    if (response.success) {
-      Alert.alert('Éxito', 'Evento creado correctamente');
-      onEventCreated(); // Actualiza HomeScreen
-      navigation.goBack();
-    } else {
-      Alert.alert('Error', response.error);
+      if (response.success) {
+        Alert.alert('Éxito', 'Evento creado correctamente');
+        
+        // Llama a refreshEvents si existe
+        if (refreshEvents) {
+          refreshEvents();
+        }
+        
+        // Navega de vuelta al Home
+        navigation.navigate('Home');
+      } else {
+        Alert.alert('Error', response.error);
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Ocurrió un problema al crear el evento');
     }
   };
 

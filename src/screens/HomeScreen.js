@@ -76,9 +76,15 @@ const fetchEvents = useCallback(async () => {
     fetchEvents();
   }, [fetchEvents]);
 
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+useEffect(() => {
+  const unsubscribe = navigation.addListener('focus', () => {
+    fetchEvents(); // Recarga los eventos cuando la pantalla obtiene foco
+  });
+
+  fetchEvents(); // Carga inicial
+
+  return unsubscribe; // Limpieza al desmontar
+}, [navigation, fetchEvents]);
 
 const renderEventItem = useCallback(({ item }) => {
     // Función para procesar los expositores
