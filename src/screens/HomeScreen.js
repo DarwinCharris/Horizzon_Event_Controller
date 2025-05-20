@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, FlatList, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, FlatList, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAllEvents } from '../service/service';
 
@@ -9,62 +9,65 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async () => {
     try {
-        setError(null);
-        setRefreshing(true);
-        
-        const response = await getAllEvents();
-        
-        if (!response.success) {
-            throw new Error(response.error);
+      setError(null);
+      setRefreshing(true);
+      
+      const response = await getAllEvents();
+      
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+
+      const processedEvents = response.data.map(event => {
+        // Procesar speakers para asegurar consistencia
+        let speakers = [];
+        try {
+          if (event.speakers) {
+            // Si es string, parsear
+            if (typeof event.speakers === 'string') {
+              speakers = JSON.parse(event.speakers);
+            } else {
+              speakers = event.speakers;
+            }
+            
+            // Convertir a formato objeto si es necesario
+            if (Array.isArray(speakers)) {
+              speakers = speakers.map(speaker => {
+                return typeof speaker === 'string' 
+                  ? { name: speaker, title: '' } 
+                  : speaker;
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error processing speakers:', error);
+          speakers = [];
         }
 
-        const processedEvents = response.data.map(event => {
-            // Procesar speakers para asegurar consistencia
-            let speakers = [];
-            try {
-                if (event.speakers) {
-                    // Si es string, parsear
-                    if (typeof event.speakers === 'string') {
-                        speakers = JSON.parse(event.speakers);
-                    } else {
-                        speakers = event.speakers;
-                    }
-                    
-                    // Convertir a formato objeto si es necesario
-                    if (Array.isArray(speakers)) {
-                        speakers = speakers.map(speaker => {
-                            return typeof speaker === 'string' 
-                                ? { name: speaker, title: '' } 
-                                : speaker;
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error processing speakers:', error);
-                speakers = [];
-            }
+        return {
+          ...event,
+          speakers: speakers || [],
+          formattedStartDate: formatDate(event.initial_date || event.initialDate),
+          formattedEndDate: formatDate(event.final_date || event.finalDate),
+          trackName: event.event_track_name || event.eventTrackName || 'Sin categoría',
+          available_seats: event.available_seats || event.availableSeats || 0,
+          // Manejo de imágenes en base64
+          coverImageBase64: event.coverImageBase64 || event.cover_image || event.coverImage,
+          cardImageBase64: event.cardImageBase64 || event.card_image || event.cardImage
+        };
+      });
 
-            return {
-                ...event,
-                speakers: speakers || [],
-                formattedStartDate: formatDate(event.initial_date),
-                formattedEndDate: formatDate(event.final_date),
-                trackName: event.event_track_name || 'Sin categoría',
-                available_seats: event.available_seats || 0
-            };
-        });
-
-        setEvents(processedEvents);
+      setEvents(processedEvents);
     } catch (error) {
-        console.error('Error al cargar eventos:', error);
-        setError(error.message);
+      console.error('Error al cargar eventos:', error);
+      setError(error.message);
     } finally {
-        setLoading(false);
-        setRefreshing(false);
+      setLoading(false);
+      setRefreshing(false);
     }
-}, []);
+  }, []);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Fecha no definida';
@@ -76,94 +79,104 @@ const fetchEvents = useCallback(async () => {
     fetchEvents();
   }, [fetchEvents]);
 
-useEffect(() => {
-  const unsubscribe = navigation.addListener('focus', () => {
-    fetchEvents(); // Recarga los eventos cuando la pantalla obtiene foco
-  });
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchEvents();
+    });
 
-  fetchEvents(); // Carga inicial
+    fetchEvents();
 
-  return unsubscribe; // Limpieza al desmontar
-}, [navigation, fetchEvents]);
+    return unsubscribe;
+  }, [navigation, fetchEvents]);
 
-const renderEventItem = useCallback(({ item }) => {
-    // Función para procesar los expositores
-    const getSpeakerNames = (speakers) => {
-        if (!speakers) return [];
-        
-        try {
-            const parsed = typeof speakers === 'string' ? JSON.parse(speakers) : speakers;
-            if (!Array.isArray(parsed)) return [];
-            
-            return parsed.map(speaker => {
-                // Solo extraemos el nombre sin título
-                return typeof speaker === 'string' ? speaker : speaker?.name || '';
-            }).filter(name => name.trim());
-        } catch (error) {
-            console.error('Error parsing speakers:', error);
-            return [];
-        }
-    };
+  const getSpeakerNames = (speakers) => {
+    if (!speakers) return [];
+    
+    try {
+      const parsed = typeof speakers === 'string' ? JSON.parse(speakers) : speakers;
+      if (!Array.isArray(parsed)) return [];
+      
+      return parsed.map(speaker => {
+        return typeof speaker === 'string' ? speaker : speaker?.name || '';
+      }).filter(name => name.trim());
+    } catch (error) {
+      console.error('Error parsing speakers:', error);
+      return [];
+    }
+  };
 
+  const renderEventItem = useCallback(({ item }) => {
     const speakerNames = getSpeakerNames(item.speakers);
+    const imageUri = item.coverImageBase64?.startsWith('data:image') 
+      ? item.coverImageBase64 
+      : `data:image/png;base64,${item.coverImageBase64}`;
 
     return (
-        <TouchableOpacity 
-            style={styles.eventCard}
-            onPress={() => navigation.navigate('EventDetail', { 
-                eventId: item.id,
-                eventData: item 
-            })}
-            activeOpacity={0.8}
-        >
-            <View style={styles.eventInfo}>
-                <Text style={styles.eventTitle} numberOfLines={2}>{item.name}</Text>
-                
-            {speakerNames.length > 0 && (
-                <View style={styles.speakersContainer}>
-                    <Ionicons name="people" size={16} color="#8bd5fc" />
-                    <Text style={styles.speakersText}>
-                        {speakerNames.join(', ')}
-                    </Text>
-                </View>
-            )}
-
-                <View style={styles.eventMeta}>
-                    <View style={styles.trackBadge}>
-                        <Text style={styles.eventTrack} numberOfLines={1}>
-                            {item.trackName || 'Sin categoría'}
-                        </Text>
-                    </View>
-                    <View style={styles.dateContainer}>
-                        <Ionicons name="calendar" size={16} color="#8bd5fc" />
-                        <Text style={styles.eventDate} numberOfLines={1}>
-                            {item.formattedStartDate} - {item.formattedEndDate}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.eventFooter}>
-                    <View style={styles.locationContainer}>
-                        <Ionicons name="location" size={16} color="#8bd5fc" />
-                        <Text style={styles.eventLocation} numberOfLines={1}>
-                            {item.location || 'Ubicación no definida'}
-                        </Text>
-                    </View>
-                    <View style={[
-                        styles.seatsBadge,
-                        item.available_seats < 10 && styles.lowSeats
-                    ]}>
-                        <Text style={styles.eventSeats}>
-                            {item.available_seats} asientos
-                        </Text>
-                    </View>
-                </View>
+      <TouchableOpacity 
+        style={styles.eventCard}
+        onPress={() => navigation.navigate('EventDetail', { 
+          eventId: item.id,
+          eventData: item 
+        })}
+        activeOpacity={0.8}
+      >
+        {item.coverImageBase64 ? (
+          <Image 
+            source={{ uri: imageUri }} 
+            style={styles.eventImage}
+          />
+        ) : (
+          <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
+            <Ionicons name="calendar" size={40} color="#8bd5fc" />
+          </View>
+        )}
+        
+        <View style={styles.eventInfo}>
+          <Text style={styles.eventTitle} numberOfLines={2}>{item.name}</Text>
+          
+          {speakerNames.length > 0 && (
+            <View style={styles.speakersContainer}>
+              <Ionicons name="people" size={16} color="#8bd5fc" />
+              <Text style={styles.speakersText}>
+                {speakerNames.join(', ')}
+              </Text>
             </View>
-        </TouchableOpacity>
+          )}
+
+          <View style={styles.eventMeta}>
+            <View style={styles.trackBadge}>
+              <Text style={styles.eventTrack} numberOfLines={1}>
+                {item.trackName || 'Sin categoría'}
+              </Text>
+            </View>
+            <View style={styles.dateContainer}>
+              <Ionicons name="calendar" size={16} color="#8bd5fc" />
+              <Text style={styles.eventDate} numberOfLines={1}>
+                {item.formattedStartDate} - {item.formattedEndDate}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.eventFooter}>
+            <View style={styles.locationContainer}>
+              <Ionicons name="location" size={16} color="#8bd5fc" />
+              <Text style={styles.eventLocation} numberOfLines={1}>
+                {item.location || 'Ubicación no definida'}
+              </Text>
+            </View>
+            <View style={[
+              styles.seatsBadge,
+              item.available_seats < 10 && styles.lowSeats
+            ]}>
+              <Text style={styles.eventSeats}>
+                {item.available_seats} asientos
+              </Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
     );
-}, [navigation]);
-
-
+  }, [navigation]);
 
   if (loading && events.length === 0) {
     return (
@@ -221,6 +234,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingTop: 10, // Añadido para mejor espaciado
   },
   loadingContainer: {
     flex: 1,
@@ -288,6 +302,17 @@ const styles = StyleSheet.create({
     elevation: 3,
     overflow: 'hidden',
   },
+  eventImage: {
+    width: '100%',
+    height: 150,
+    resizeMode: 'cover'
+  },
+  eventImagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e6f6fe',
+    height: 150,
+  },
   eventInfo: {
     padding: 18,
   },
@@ -296,6 +321,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 12,
     color: '#333',
+  },
+  speakersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  speakersText: {
+    color: '#555',
+    fontSize: 14,
+    marginLeft: 6,
   },
   eventMeta: {
     marginBottom: 14,
@@ -317,12 +352,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  calendarIcon: {
-    marginRight: 6,
-  },
   eventDate: {
     color: '#555',
     fontSize: 14,
+    marginLeft: 6,
   },
   eventFooter: {
     flexDirection: 'row',
@@ -387,14 +420,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-    speakersContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    speakersText: {
-        color: '#555',
-        fontSize: 14,
-        marginLeft: 6,
-    },
 });
