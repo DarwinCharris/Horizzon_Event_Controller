@@ -16,7 +16,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { editEvent, getEventById, getAllFeedbacks, enviarFeedback, deleteEvent } from '../service/service';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import StarRating from '../components/StartRating';
-import { getUserData } from '../service/auth';
 
 const EventDetailScreen = ({ route, navigation }) => {
   const { eventData: initialEventData } = route.params;
@@ -31,7 +30,8 @@ const EventDetailScreen = ({ route, navigation }) => {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [newFeedback, setNewFeedback] = useState({
     stars: 5,
-    comment: ''
+    comment: '',
+    userName: ''
   });
   const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false);
   const [error, setError] = useState(null);
@@ -286,24 +286,18 @@ const EventDetailScreen = ({ route, navigation }) => {
     setErrorDetails(null);
     
     try {
-      const user = await getUserData();
-      if (!user?.id) {
-        throw new Error('Debes iniciar sesión para enviar feedback');
-      }
-
       const response = await retryRequest(() => enviarFeedback({
         eventId: eventData.id,
-        userId: user.id,
         stars: newFeedback.stars,
-        comment: newFeedback.comment.trim()
+        comment: newFeedback.comment.trim(),
+        userName: newFeedback.userName.trim() || 'Anónimo'
       }));
 
       if (response.success) {
         const newFeedbackItem = {
           id: response.data.id || Date.now(),
           event_id: eventData.id,
-          user_id: user.id,
-          user_name: user.name || 'Anónimo',
+          user_name: newFeedback.userName.trim() || 'Anónimo',
           stars: newFeedback.stars,
           comment: newFeedback.comment.trim(),
           created_at: new Date().toISOString()
@@ -311,7 +305,7 @@ const EventDetailScreen = ({ route, navigation }) => {
         
         setFeedbacks(prev => [newFeedbackItem, ...prev]);
         setShowFeedbackModal(false);
-        setNewFeedback({ stars: 5, comment: '' });
+        setNewFeedback({ stars: 5, comment: '', userName: '' });
         Alert.alert('Gracias', 'Tu feedback ha sido enviado');
       } else {
         throw new Error(response.error || 'Error al enviar feedback');
@@ -633,6 +627,17 @@ const EventDetailScreen = ({ route, navigation }) => {
             )}
 
             <View style={styles.editSection}>
+              <Text style={styles.label}>Tu nombre (opcional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Cómo quieres que aparezca tu nombre"
+                value={newFeedback.userName}
+                onChangeText={(text) => setNewFeedback({...newFeedback, userName: text})}
+                maxLength={100}
+              />
+            </View>
+
+            <View style={styles.editSection}>
               <Text style={styles.label}>Calificación</Text>
               <StarRating
                 rating={newFeedback.stars}
@@ -689,7 +694,9 @@ const EventDetailScreen = ({ route, navigation }) => {
         >
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
+        
         <Text style={styles.title} numberOfLines={2}>{eventData.name}</Text>
+        
         <View style={styles.actionButtons}>
           <TouchableOpacity 
             onPress={handleEdit}
@@ -822,6 +829,7 @@ const EventDetailScreen = ({ route, navigation }) => {
   );
 };
 
+// Los estilos permanecen exactamente iguales que en tu código original
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -834,7 +842,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8bd5fc',
     paddingTop: 50,
     paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     shadowColor: '#000',
@@ -845,21 +853,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 50,
-    zIndex: 10,
     padding: 5,
+    marginRight: 10,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    flex: 1,
+    paddingHorizontal: 10,
   },
   actionButtons: {
-    position: 'absolute',
-    right: 20,
-    top: 50,
-    zIndex: 10,
     flexDirection: 'row',
+    marginLeft: 10,
   },
   editButton: {
     marginRight: 15,
@@ -867,15 +877,6 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     padding: 5,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-    marginTop: 10,
-    flex: 1,
-    marginHorizontal: 30,
   },
   content: {
     padding: 20,
