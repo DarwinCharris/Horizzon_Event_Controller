@@ -22,8 +22,48 @@ export default function EventTrackDetailScreen({ route, navigation }) {
         throw new Error(response.error);
       }
 
+      // Procesamos los eventos similar al HomeScreen
+      const processedEvents = response.data.events?.map(event => {
+        // Procesar speakers para asegurar consistencia
+        let speakers = [];
+        try {
+          if (event.speakers) {
+            // Si es string, parsear
+            if (typeof event.speakers === 'string') {
+              speakers = JSON.parse(event.speakers);
+            } else {
+              speakers = event.speakers;
+            }
+            
+            // Convertir a formato objeto si es necesario
+            if (Array.isArray(speakers)) {
+              speakers = speakers.map(speaker => {
+                return typeof speaker === 'string' 
+                  ? { name: speaker, title: '' } 
+                  : speaker;
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error processing speakers:', error);
+          speakers = [];
+        }
+
+        return {
+          ...event,
+          speakers: speakers || [],
+          formattedStartDate: formatDate(event.initial_date || event.initialDate),
+          formattedEndDate: formatDate(event.final_date || event.finalDate),
+          trackName: event.event_track_name || event.eventTrackName || 'Sin categoría',
+          available_seats: event.available_seats || event.availableSeats || 0,
+          // Manejo de imágenes en base64
+          coverImageBase64: event.coverImageBase64 || event.cover_image || event.coverImage,
+          cardImageBase64: event.cardImageBase64 || event.card_image || event.cardImage
+        };
+      }) || [];
+
       setTrackInfo(response.data.eventTrack);
-      setEvents(response.data.events || []);
+      setEvents(processedEvents);
     } catch (error) {
       console.error('Error al cargar eventos del track:', error);
       setError(error.message);
@@ -32,6 +72,12 @@ export default function EventTrackDetailScreen({ route, navigation }) {
       setRefreshing(false);
     }
   }, [trackId]);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Fecha no definida';
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString('es-ES', options);
+  };
 
   const onRefresh = useCallback(() => {
     fetchTrackEvents();
@@ -47,34 +93,94 @@ export default function EventTrackDetailScreen({ route, navigation }) {
     return unsubscribe;
   }, [navigation, fetchTrackEvents]);
 
-  const renderEventItem = useCallback(({ item }) => (
-    <TouchableOpacity 
-      style={styles.eventCard}
-      onPress={() => navigation.navigate('EventDetail', { 
-        eventId: item.id,
-        eventData: item 
-      })}
-      activeOpacity={0.8}
-    >
-      {item.coverImageBase64 ? (
-        <Image 
-          source={{ uri: `data:image/png;base64,${item.coverImageBase64}` }} 
-          style={styles.eventImage}
-        />
-      ) : (
-        <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
-          <Ionicons name="calendar" size={40} color="#8bd5fc" />
-        </View>
-      )}
+  const getSpeakerNames = (speakers) => {
+    if (!speakers) return [];
+    
+    try {
+      const parsed = typeof speakers === 'string' ? JSON.parse(speakers) : speakers;
+      if (!Array.isArray(parsed)) return [];
       
-      <View style={styles.eventInfo}>
-        <Text style={styles.eventTitle} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.eventDescription} numberOfLines={3}>
-          {item.description || 'Sin descripción'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  ), [navigation]);
+      return parsed.map(speaker => {
+        return typeof speaker === 'string' ? speaker : speaker?.name || '';
+      }).filter(name => name.trim());
+    } catch (error) {
+      console.error('Error parsing speakers:', error);
+      return [];
+    }
+  };
+
+  const renderEventItem = useCallback(({ item }) => {
+    const speakerNames = getSpeakerNames(item.speakers);
+    const imageUri = item.coverImageBase64?.startsWith('data:image') 
+      ? item.coverImageBase64 
+      : `data:image/png;base64,${item.coverImageBase64}`;
+
+    return (
+      <TouchableOpacity 
+        style={styles.eventCard}
+        onPress={() => navigation.navigate('EventDetail', { 
+          eventId: item.id,
+          eventData: item 
+        })}
+        activeOpacity={0.8}
+      >
+        {item.coverImageBase64 ? (
+          <Image 
+            source={{ uri: imageUri }} 
+            style={styles.eventImage}
+          />
+        ) : (
+          <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
+            <Ionicons name="calendar" size={40} color="#8bd5fc" />
+          </View>
+        )}
+        
+        <View style={styles.eventInfo}>
+          <Text style={styles.eventTitle} numberOfLines={2}>{item.name}</Text>
+          
+          {speakerNames.length > 0 && (
+            <View style={styles.speakersContainer}>
+              <Ionicons name="people" size={16} color="#8bd5fc" />
+              <Text style={styles.speakersText}>
+                {speakerNames.join(', ')}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.eventMeta}>
+            <View style={styles.trackBadge}>
+              <Text style={styles.eventTrack} numberOfLines={1}>
+                {item.trackName || 'Sin categoría'}
+              </Text>
+            </View>
+            <View style={styles.dateContainer}>
+              <Ionicons name="calendar" size={16} color="#8bd5fc" />
+              <Text style={styles.eventDate} numberOfLines={1}>
+                {item.formattedStartDate} - {item.formattedEndDate}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.eventFooter}>
+            <View style={styles.locationContainer}>
+              <Ionicons name="location" size={16} color="#8bd5fc" />
+              <Text style={styles.eventLocation} numberOfLines={1}>
+                {item.location || 'Ubicación no definida'}
+              </Text>
+            </View>
+            <View style={[
+              styles.seatsBadge,
+              item.available_seats < 10 && styles.lowSeats
+            ]}>
+              <Text style={styles.eventSeats}>
+                {item.available_seats} asientos
+              </Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [navigation]);
 
   if (loading && events.length === 0) {
     return (
@@ -114,7 +220,11 @@ export default function EventTrackDetailScreen({ route, navigation }) {
         <View style={styles.trackHeader}>
           {trackInfo.coverImageBase64 ? (
             <Image 
-              source={{ uri: `data:image/png;base64,${trackInfo.coverImageBase64}` }} 
+              source={{ 
+                uri: trackInfo.coverImageBase64.startsWith('data:image') 
+                  ? trackInfo.coverImageBase64 
+                  : `data:image/png;base64,${trackInfo.coverImageBase64}`
+              }} 
               style={styles.trackHeaderImage}
             />
           ) : (
@@ -186,6 +296,7 @@ const styles = StyleSheet.create({
   trackHeaderImage: {
     width: '100%',
     height: 180,
+    resizeMode: 'cover'
   },
   trackHeaderImagePlaceholder: {
     justifyContent: 'center',
@@ -219,6 +330,7 @@ const styles = StyleSheet.create({
   eventImage: {
     width: '100%',
     height: 150,
+    resizeMode: 'cover'
   },
   eventImagePlaceholder: {
     justifyContent: 'center',
@@ -226,17 +338,78 @@ const styles = StyleSheet.create({
     backgroundColor: '#e6f6fe',
   },
   eventInfo: {
-    padding: 16,
+    padding: 18,
   },
   eventTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 12,
     color: '#333',
   },
-  eventDescription: {
+  speakersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  speakersText: {
+    color: '#555',
     fontSize: 14,
-    color: '#666',
-    marginTop: 8,
+    marginLeft: 6,
+  },
+  eventMeta: {
+    marginBottom: 14,
+  },
+  trackBadge: {
+    backgroundColor: '#e6f6fe',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  eventTrack: {
+    color: '#0077b6',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eventDate: {
+    color: '#555',
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  eventFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  eventLocation: {
+    color: '#555',
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  seatsBadge: {
+    backgroundColor: '#e6f6fe',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  lowSeats: {
+    backgroundColor: '#ffebee',
+  },
+  eventSeats: {
+    fontWeight: '600',
+    color: '#4CAF50',
+    fontSize: 14,
   },
   errorContainer: {
     flex: 1,

@@ -20,7 +20,14 @@ export default function EventTrackScreen({ navigation }) {
         throw new Error(response.error);
       }
 
-      setEventTracks(response.data);
+      // Procesar las líneas de eventos para manejar diferentes formatos de imagen
+      const processedTracks = response.data.map(track => ({
+        ...track,
+        coverImageBase64: track.coverImageBase64 || track.cover_image || track.coverImage,
+        overlayImageBase64: track.overlayImageBase64 || track.overlay_image || track.overlayImage
+      }));
+
+      setEventTracks(processedTracks);
     } catch (error) {
       console.error('Error al cargar líneas de eventos:', error);
       setError(error.message);
@@ -44,34 +51,52 @@ export default function EventTrackScreen({ navigation }) {
     return unsubscribe;
   }, [navigation, fetchEventTracks]);
 
-  const renderEventTrackItem = useCallback(({ item }) => (
-    <TouchableOpacity 
-      style={styles.trackCard}
-      onPress={() => navigation.navigate('EventTrackDetail', { 
-        trackId: item.id,
-        trackName: item.name
-      })}
-      activeOpacity={0.8}
-    >
-      {item.coverImageBase64 ? (
-        <Image 
-          source={{ uri: `data:image/png;base64,${item.coverImageBase64}` }} 
-          style={styles.trackImage}
-        />
-      ) : (
-        <View style={[styles.trackImage, styles.trackImagePlaceholder]}>
-          <Ionicons name="list" size={40} color="#8bd5fc" />
+  const renderEventTrackItem = useCallback(({ item }) => {
+    // Determinar la URI de la imagen
+    const imageUri = item.coverImageBase64?.startsWith('data:image') 
+      ? item.coverImageBase64 
+      : `data:image/png;base64,${item.coverImageBase64}`;
+
+    return (
+      <TouchableOpacity 
+        style={styles.trackCard}
+        onPress={() => navigation.navigate('EventTrackDetail', { 
+          trackId: item.id,
+          trackName: item.name
+        })}
+        activeOpacity={0.8}
+      >
+        {item.coverImageBase64 ? (
+          <Image 
+            source={{ uri: imageUri }} 
+            style={styles.trackImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.trackImage, styles.trackImagePlaceholder]}>
+            <Ionicons name="list" size={40} color="#8bd5fc" />
+          </View>
+        )}
+        
+        <View style={styles.trackInfo}>
+          <Text style={styles.trackTitle} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.trackDescription} numberOfLines={3}>
+            {item.description || 'Sin descripción'}
+          </Text>
+          
+          {/* Mostrar número de eventos si está disponible */}
+          {item.eventsCount !== undefined && (
+            <View style={styles.eventsBadge}>
+              <Ionicons name="calendar" size={16} color="#8bd5fc" />
+              <Text style={styles.eventsCount}>
+                {item.eventsCount} eventos
+              </Text>
+            </View>
+          )}
         </View>
-      )}
-      
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.trackDescription} numberOfLines={3}>
-          {item.description || 'Sin descripción'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  ), [navigation]);
+      </TouchableOpacity>
+    );
+  }, [navigation]);
 
   if (loading && eventTracks.length === 0) {
     return (
@@ -129,6 +154,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingTop: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -222,6 +248,23 @@ const styles = StyleSheet.create({
   trackDescription: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 4,
+  },
+  eventsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e6f6fe',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  eventsCount: {
+    color: '#0077b6',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 4,
   },
   emptyContainer: {
     flex: 1,
