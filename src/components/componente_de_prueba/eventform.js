@@ -1,4 +1,3 @@
-// CreateEventForm.js
 import React, { useState } from "react";
 import {
   View,
@@ -9,11 +8,15 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import ImageUriPicker from "./uir";
 import { createEvent } from "../../service/service";
 
-const CreateEventForm = () => {
+const CreateEventForm = ({ route }) => {
+  const { refreshEvents, closeForm } = route.params || {};
+
   const [form, setForm] = useState({
     trackId: "",
     eventTrackName: "",
@@ -27,7 +30,7 @@ const CreateEventForm = () => {
     seats: "",
   });
 
-  const [speakers, setSpeakers] = useState([""]); // Array de strings
+  const [speakers, setSpeakers] = useState([""]);
   const [coverUri, setCoverUri] = useState(null);
   const [cardUri, setCardUri] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -112,8 +115,8 @@ const CreateEventForm = () => {
   };
 
   const formatDateForAPI = (dateString) => {
-    const [year, month, day] = dateString.split('-');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    const [year, month, day] = dateString.split("-");
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   };
 
   const handleSubmit = async () => {
@@ -133,7 +136,7 @@ const CreateEventForm = () => {
         location: form.location,
         capacity: parseInt(form.capacity),
         availableSeats: parseInt(form.seats),
-        speakers: speakers.filter(name => name.trim() !== ""), // Filtramos nombres vacíos
+        speakers: speakers.filter((name) => name.trim() !== ""),
         coverPath: coverUri,
         cardPath: cardUri,
       };
@@ -141,171 +144,165 @@ const CreateEventForm = () => {
       console.log("Datos a enviar:", JSON.stringify(eventData, null, 2));
 
       const response = await createEvent(eventData);
-      
+
       if (!response.success) {
         throw new Error(response.error || "Error al crear evento");
       }
 
       Alert.alert("Éxito", "Evento creado correctamente");
-      resetForm();
+
+      if (refreshEvents) refreshEvents();
+      if (closeForm) closeForm();
     } catch (error) {
       console.error("Error detallado:", error);
       Alert.alert(
-        "Error", 
-        error.response?.data?.message || 
-        error.message || 
-        "Error al conectar con el servidor"
+        "Error",
+        error.response?.data?.message ||
+          error.message ||
+          "Error al conectar con el servidor"
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setForm({
-      trackId: "",
-      eventTrackName: "",
-      name: "",
-      description: "",
-      longDescription: "",
-      start: "",
-      end: "",
-      location: "",
-      capacity: "",
-      seats: "",
-    });
-    setSpeakers([""]); // Reset a array con un string vacío
-    setCoverUri(null);
-    setCardUri(null);
-  };
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.sectionTitle}>Información Básica</Text>
-      
-      {[
-        ["trackId", "ID del Track (eventTrackId)", "text"],
-        ["eventTrackName", "Nombre del Track", "text"],
-        ["name", "Nombre del Evento*", "text"],
-        ["description", "Descripción corta*", "text"],
-        ["longDescription", "Descripción larga*", "text"],
-      ].map(([key, placeholder]) => (
-        <View key={key}>
-          <TextInput
-            placeholder={placeholder}
-            value={form[key]}
-            onChangeText={(text) => handleChange(key, text)}
-            style={[
-              styles.input,
-              formErrors[key] && styles.inputError
-            ]}
-            multiline={key.includes('Description')}
-          />
-          {formErrors[key] && <Text style={styles.errorText}>{formErrors[key]}</Text>}
-        </View>
-      ))}
-
-      <Text style={styles.sectionTitle}>Fechas y Ubicación</Text>
-      
-      {[
-        ["start", "Fecha inicio (YYYY-MM-DD)*", "text"],
-        ["end", "Fecha fin (YYYY-MM-DD)*", "text"],
-        ["location", "Ubicación*", "text"],
-      ].map(([key, placeholder]) => (
-        <View key={key}>
-          <TextInput
-            placeholder={placeholder}
-            value={form[key]}
-            onChangeText={(text) => handleChange(key, text)}
-            style={[
-              styles.input,
-              formErrors[key] && styles.inputError
-            ]}
-          />
-          {formErrors[key] && <Text style={styles.errorText}>{formErrors[key]}</Text>}
-        </View>
-      ))}
-
-      <Text style={styles.sectionTitle}>Capacidad</Text>
-      
-      {[
-        ["capacity", "Capacidad total*", "numeric"],
-        ["seats", "Asientos disponibles*", "numeric"],
-      ].map(([key, placeholder]) => (
-        <View key={key}>
-          <TextInput
-            placeholder={placeholder}
-            value={form[key]}
-            onChangeText={(text) => handleChange(key, text.replace(/[^0-9]/g, ''))}
-            style={[
-              styles.input,
-              formErrors[key] && styles.inputError
-            ]}
-            keyboardType="numeric"
-          />
-          {formErrors[key] && <Text style={styles.errorText}>{formErrors[key]}</Text>}
-        </View>
-      ))}
-
-      <Text style={styles.sectionTitle}>Speakers</Text>
-      {speakers.map((name, index) => (
-        <View key={index} style={styles.speakerItem}>
-          <View style={styles.speakerInputContainer}>
-            <TextInput
-              placeholder={`Nombre del speaker ${index + 1}`}
-              value={name}
-              onChangeText={(text) => handleSpeakerChange(index, text)}
-              style={styles.speakerInput}
-            />
-          </View>
-          {speakers.length > 1 && (
-            <View style={styles.removeButton}>
-              <Button
-                title="Eliminar"
-                onPress={() => removeSpeaker(index)}
-                color="#ff4444"
-              />
-            </View>
-          )}
-        </View>
-      ))}
-      <View style={styles.addButton}>
-        <Button
-          title="Agregar otro speaker"
-          onPress={addSpeaker}
-          color="#4285f4"
-        />
+    <>
+      {/* Botón de cerrar con ícono X */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={closeForm}>
+          <Ionicons name="close" size={28} color="#333" />
+        </TouchableOpacity>
       </View>
 
-      <Text style={styles.sectionTitle}>Imágenes</Text>
-      
-      <Text style={styles.label}>Portada del Evento*</Text>
-      <ImageUriPicker 
-        onUriPicked={setCoverUri} 
-        currentUri={coverUri}
-      />
-      {formErrors.coverUri && <Text style={styles.errorText}>{formErrors.coverUri}</Text>}
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.sectionTitle}>Información Básica</Text>
 
-      <Text style={styles.label}>Imagen de Tarjeta*</Text>
-      <ImageUriPicker 
-        onUriPicked={setCardUri} 
-        currentUri={cardUri}
-      />
-      {formErrors.cardUri && <Text style={styles.errorText}>{formErrors.cardUri}</Text>}
+        {[
+          ["trackId", "ID del Track (eventTrackId)"],
+          ["eventTrackName", "Nombre del Track"],
+          ["name", "Nombre del Evento*"],
+          ["description", "Descripción corta*"],
+          ["longDescription", "Descripción larga*"],
+        ].map(([key, placeholder]) => (
+          <View key={key}>
+            <TextInput
+              placeholder={placeholder}
+              value={form[key]}
+              onChangeText={(text) => handleChange(key, text)}
+              style={[styles.input, formErrors[key] && styles.inputError]}
+              multiline={key.includes("Description")}
+            />
+            {formErrors[key] && (
+              <Text style={styles.errorText}>{formErrors[key]}</Text>
+            )}
+          </View>
+        ))}
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#4285f4" style={styles.loader} />
-      ) : (
-        <View style={styles.submitButton}>
+        <Text style={styles.sectionTitle}>Fechas y Ubicación</Text>
+
+        {[
+          ["start", "Fecha inicio (YYYY-MM-DD)*"],
+          ["end", "Fecha fin (YYYY-MM-DD)*"],
+          ["location", "Ubicación*"],
+        ].map(([key, placeholder]) => (
+          <View key={key}>
+            <TextInput
+              placeholder={placeholder}
+              value={form[key]}
+              onChangeText={(text) => handleChange(key, text)}
+              style={[styles.input, formErrors[key] && styles.inputError]}
+            />
+            {formErrors[key] && (
+              <Text style={styles.errorText}>{formErrors[key]}</Text>
+            )}
+          </View>
+        ))}
+
+        <Text style={styles.sectionTitle}>Capacidad</Text>
+
+        {[
+          ["capacity", "Capacidad total*"],
+          ["seats", "Asientos disponibles*"],
+        ].map(([key, placeholder]) => (
+          <View key={key}>
+            <TextInput
+              placeholder={placeholder}
+              value={form[key]}
+              onChangeText={(text) =>
+                handleChange(key, text.replace(/[^0-9]/g, ""))
+              }
+              style={[styles.input, formErrors[key] && styles.inputError]}
+              keyboardType="numeric"
+            />
+            {formErrors[key] && (
+              <Text style={styles.errorText}>{formErrors[key]}</Text>
+            )}
+          </View>
+        ))}
+
+        <Text style={styles.sectionTitle}>Speakers</Text>
+        {speakers.map((name, index) => (
+          <View key={index} style={styles.speakerItem}>
+            <View style={styles.speakerInputContainer}>
+              <TextInput
+                placeholder={`Nombre del speaker ${index + 1}`}
+                value={name}
+                onChangeText={(text) => handleSpeakerChange(index, text)}
+                style={styles.speakerInput}
+              />
+            </View>
+            {speakers.length > 1 && (
+              <View style={styles.removeButton}>
+                <Button
+                  title="Eliminar"
+                  onPress={() => removeSpeaker(index)}
+                  color="#ff4444"
+                />
+              </View>
+            )}
+          </View>
+        ))}
+        <View style={styles.addButton}>
           <Button
-            title="Crear Evento"
-            onPress={handleSubmit}
+            title="Agregar otro speaker"
+            onPress={addSpeaker}
             color="#4285f4"
-            disabled={loading}
           />
         </View>
-      )}
-    </ScrollView>
+
+        <Text style={styles.sectionTitle}>Imágenes</Text>
+
+        <Text style={styles.label}>Portada del Evento*</Text>
+        <ImageUriPicker onUriPicked={setCoverUri} currentUri={coverUri} />
+        {formErrors.coverUri && (
+          <Text style={styles.errorText}>{formErrors.coverUri}</Text>
+        )}
+
+        <Text style={styles.label}>Imagen de Tarjeta*</Text>
+        <ImageUriPicker onUriPicked={setCardUri} currentUri={cardUri} />
+        {formErrors.cardUri && (
+          <Text style={styles.errorText}>{formErrors.cardUri}</Text>
+        )}
+
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#4285f4"
+            style={styles.loader}
+          />
+        ) : (
+          <View style={styles.submitButton}>
+            <Button
+              title="Crear Evento"
+              onPress={handleSubmit}
+              color="#4285f4"
+              disabled={loading}
+            />
+          </View>
+        )}
+      </ScrollView>
+    </>
   );
 };
 
@@ -314,36 +311,41 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  topBar: {
+    marginTop: 40,
+    marginRight: 20,
+    alignItems: "flex-end",
+  },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: 20,
     marginBottom: 10,
-    color: '#4285f4',
+    color: "#4285f4",
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     padding: 12,
     marginBottom: 15,
     borderRadius: 6,
     fontSize: 16,
   },
   inputError: {
-    borderColor: '#ff4444',
-    backgroundColor: '#fff9f9',
+    borderColor: "#ff4444",
+    backgroundColor: "#fff9f9",
   },
   errorText: {
-    color: '#ff4444',
+    color: "#ff4444",
     marginTop: -10,
     marginBottom: 15,
     fontSize: 14,
   },
   speakerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 15,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderRadius: 8,
     padding: 10,
   },
@@ -353,11 +355,11 @@ const styles = StyleSheet.create({
   },
   speakerInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     padding: 10,
     borderRadius: 6,
     fontSize: 16,
-    backgroundColor: 'white',
+    backgroundColor: "white",
   },
   removeButton: {
     width: 90,
@@ -368,8 +370,8 @@ const styles = StyleSheet.create({
   },
   label: {
     marginBottom: 8,
-    fontWeight: '600',
-    color: '#555',
+    fontWeight: "600",
+    color: "#555",
   },
   submitButton: {
     marginTop: 30,
