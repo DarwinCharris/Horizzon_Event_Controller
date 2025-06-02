@@ -4,18 +4,20 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 
-// Importa tus componentes correctamente
+// Pantallas y componentes
 import HomeScreen from "./src/screens/HomeScreen";
 import EventTrackScreen from "./src/screens/EventTrackScreen";
-import StatsScreen from "./src/screens/StatsScreen"; // Asegúrate de crear este componente
+import StatsScreen from "./src/screens/StatsScreen";
 import EventDetailScreen from "./src/screens/EventDetailScreen";
 import { TopNavBar } from "./src/components/TopNavBar";
 import EventTrackDetailScreen from "./src/screens/EventTrackDetailScreen";
 import AddEventTrackScreen from "./src/screens/AddEventTrackScreen";
+import Feedbacks from "./src/components/Feedbacks"; // ✅ NUEVO
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+// Navegación inferior con tabs
 const MainNavigator = () => {
   return (
     <>
@@ -57,6 +59,7 @@ const MainNavigator = () => {
   );
 };
 
+// Navegador principal con stack
 export default function App() {
   return (
     <NavigationContainer>
@@ -80,6 +83,16 @@ export default function App() {
           name="AddEventTrack"
           component={AddEventTrackScreen}
           options={{ title: "Nueva Línea" }}
+        />
+
+        {/* ✅ Nueva pantalla Feedbacks */}
+        <Stack.Screen
+          name="Feedbacks"
+          component={Feedbacks}
+          options={({ route }) => ({
+            title: route.params?.eventName || "Feedbacks",
+            headerBackTitle: "Atrás",
+          })}
         />
       </Stack.Navigator>
     </NavigationContainer>
