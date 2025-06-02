@@ -9,12 +9,10 @@ import {
   Alert,
   Image,
   SafeAreaView,
-  ActivityIndicator,
-  Platform
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import ImageUriPicker from "../components/componente_de_prueba/uir";
 import { createEventTrack } from '../service/service';
 
 export default function AddEventTrackScreen({ navigation }) {
@@ -25,110 +23,63 @@ export default function AddEventTrackScreen({ navigation }) {
   const [coverUri, setCoverUri] = useState(null);
   const [overlayUri, setOverlayUri] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [converting, setConverting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
-  // Función mejorada para convertir a base64
-  const convertToBase64 = async (uri) => {
-    if (!uri) {
-      throw new Error('URI de imagen no válida');
-    }
+  // Validación del formulario siguiendo el patrón de CreateEventForm
+  const validateForm = () => {
+    const errors = {};
 
-    // Asegurar que el URI tenga el formato correcto
-    let adjustedUri = uri;
-    if (Platform.OS === 'android' && !uri.startsWith('file://')) {
-      adjustedUri = `file://${uri}`;
-    }
-
-    try {
-      const fileInfo = await FileSystem.getInfoAsync(adjustedUri);
-      if (!fileInfo.exists) {
-        throw new Error('El archivo de imagen no existe');
-      }
-
-      const base64 = await FileSystem.readAsStringAsync(adjustedUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      return `data:image/jpeg;base64,${base64}`;
-    } catch (error) {
-      console.error('Error en convertToBase64:', error);
-      throw new Error('Error al procesar la imagen: ' + error.message);
-    }
-  };
-
-  // Función optimizada para seleccionar imagen
-  const pickImage = useCallback(async (type) => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permiso requerido', 'Se necesita acceso a la galería');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.7,
-      });
-
-      if (!result.canceled && result.assets?.length > 0) {
-        const uri = result.assets[0].uri;
-        if (type === 'cover') {
-          setCoverUri(uri);
-        } else {
-          setOverlayUri(uri);
-        }
-      }
-    } catch (error) {
-      console.error('Error en pickImage:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen');
-    }
-  }, []);
-
-  const handleSubmit = useCallback(async () => {
-    if (!form.name.trim()) {
-      Alert.alert('Error', 'El nombre es requerido');
-      return;
+    if (!form.name?.trim()) {
+      errors.name = "El nombre es requerido";
     }
 
     if (!coverUri) {
-      Alert.alert('Error', 'La imagen de portada es requerida');
-      return;
+      errors.coverUri = "La imagen de portada es requerida";
     }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Manejo de cambios en el formulario
+  const handleChange = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (formErrors[key]) {
+      setFormErrors((prev) => ({ ...prev, [key]: null }));
+    }
+  };
+
+  const handleSubmit = useCallback(async () => {
+    if (!validateForm()) return;
 
     try {
       setLoading(true);
-      setConverting(true);
 
-      // Convertir imágenes
-      let coverBase64, overlayBase64;
-      try {
-        coverBase64 = await convertToBase64(coverUri);
-        overlayBase64 = overlayUri ? await convertToBase64(overlayUri) : null;
-      } catch (error) {
-        throw new Error('Error al procesar imágenes: ' + error.message);
-      } finally {
-        setConverting(false);
-      }
-
-      // Crear la línea de eventos
+      // Crear la línea de eventos usando las URIs directamente
+      // (usando el patrón de CreateEventForm)
       const response = await createEventTrack(
         form.name,
         form.description,
-        coverBase64,
-        overlayBase64
+        coverUri,
+        overlayUri
       );
 
-      if (response.success) {
-        Alert.alert('Éxito', 'Línea de eventos creada', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
-      } else {
-        throw new Error(response.error || 'Error al crear la línea');
+      if (!response.success) {
+        throw new Error(response.error || 'Error al crear la línea de eventos');
       }
+
+      Alert.alert('Éxito', 'Línea de eventos creada', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+
     } catch (error) {
-      console.error('Error en handleSubmit:', error);
-      Alert.alert('Error', error.message);
+      console.error('Error detallado:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.message ||
+          error.message ||
+          'Error al conectar con el servidor'
+      );
     } finally {
       setLoading(false);
     }
@@ -147,70 +98,50 @@ export default function AddEventTrackScreen({ navigation }) {
 
         <View style={styles.formContainer}>
           <Text style={styles.label}>Nombre de la línea *</Text>
-          <TextInput
-            placeholder="Ej: Congreso Tecnológico 2023"
-            value={form.name}
-            onChangeText={(text) => setForm({...form, name: text})}
-            style={styles.input}
-          />
+          <View>
+            <TextInput
+              placeholder="Ej: Congreso Tecnológico 2023"
+              value={form.name}
+              onChangeText={(text) => handleChange('name', text)}
+              style={[styles.input, formErrors.name && styles.inputError]}
+            />
+            {formErrors.name && (
+              <Text style={styles.errorText}>{formErrors.name}</Text>
+            )}
+          </View>
 
           <Text style={styles.label}>Descripción</Text>
           <TextInput
             placeholder="Describe esta línea de eventos"
             value={form.description}
-            onChangeText={(text) => setForm({...form, description: text})}
+            onChangeText={(text) => handleChange('description', text)}
             style={[styles.input, styles.multilineInput]}
             multiline
             numberOfLines={4}
           />
 
           <Text style={styles.label}>Imagen de portada *</Text>
-          <TouchableOpacity 
-            style={styles.imagePicker} 
-            onPress={() => pickImage('cover')}
-          >
-            {coverUri ? (
-              <Image 
-                source={{ uri: coverUri }}
-                style={styles.imagePreview}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <MaterialIcons name="add-a-photo" size={32} color="#8bd5fc" />
-                <Text style={styles.imagePlaceholderText}>Agregar imagen principal</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.imagePickerContainer}>
+            <ImageUriPicker onUriPicked={setCoverUri} currentUri={coverUri} />
+          </View>
+          {formErrors.coverUri && (
+            <Text style={styles.errorText}>{formErrors.coverUri}</Text>
+          )}
 
           <Text style={styles.label}>Imagen secundaria (opcional)</Text>
-          <TouchableOpacity 
-            style={styles.imagePicker} 
-            onPress={() => pickImage('overlay')}
-          >
-            {overlayUri ? (
-              <Image 
-                source={{ uri: overlayUri }}
-                style={styles.imagePreview}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <MaterialIcons name="add-a-photo" size={32} color="#8bd5fc" />
-                <Text style={styles.imagePlaceholderText}>Agregar imagen secundaria</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.imagePickerContainer}>
+            <ImageUriPicker onUriPicked={setOverlayUri} currentUri={overlayUri} />
+          </View>
 
           <TouchableOpacity 
             style={[
               styles.submitButton, 
-              (loading || converting) && styles.disabledButton
+              loading && styles.disabledButton
             ]} 
             onPress={handleSubmit}
-            disabled={loading || converting}
+            disabled={loading}
           >
-            {loading || converting ? (
+            {loading ? (
               <ActivityIndicator color="white" />
             ) : (
               <Text style={styles.submitButtonText}>Crear Línea de Eventos</Text>
@@ -263,31 +194,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
   },
+  inputError: {
+    borderColor: '#ff4444',
+    backgroundColor: '#fff9f9',
+  },
   multilineInput: {
     minHeight: 100,
     textAlignVertical: 'top',
   },
-  imagePicker: {
-    height: 200,
+  imagePickerContainer: {
     marginBottom: 20,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
   },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-  },
-  imagePlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#e6f6fe',
-  },
-  imagePlaceholderText: {
-    marginTop: 8,
-    color: '#8bd5fc',
-    fontWeight: '500',
+  errorText: {
+    color: '#ff4444',
+    marginTop: -15,
+    marginBottom: 20,
+    fontSize: 14,
   },
   submitButton: {
     backgroundColor: '#8bd5fc',
