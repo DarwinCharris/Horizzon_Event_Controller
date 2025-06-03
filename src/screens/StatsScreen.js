@@ -1,16 +1,24 @@
-// StatsScreen.js
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { SafeAreaView, ScrollView, Text, StyleSheet } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import SubsPerEvent from "../components/SubsPerEvent";
 import Stars from "../components/Stars";
 
 export default function StatsScreen() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshKey((prev) => prev + 1);
+    }, [])
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Estadísticas</Text>
-        <SubsPerEvent />
-        <Stars />
+        <SubsPerEvent key={`subs-${refreshKey}`} />
+        <Stars key={`stars-${refreshKey}`} />
       </ScrollView>
     </SafeAreaView>
   );
