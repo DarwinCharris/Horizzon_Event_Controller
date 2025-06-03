@@ -1,4 +1,4 @@
-# Horizzon
+# Horizzon - React Native
 
 **📱 Proyecto de Desarrollo Móvil**
 
@@ -10,16 +10,6 @@ El sistema permite:
 - CRUD de eventos dentro de cada track
 - Visualización de estadísticas de participación
 - Recolección de feedback anónimo de los eventos
----
-
-## 📦 Repositorio
-
-Este repositorio incluye:
-
-- 📲  Aplicación Flutter para los asistentes a la conferencia  
-- ⚙️ Aplicación React Native
-- 🛠️ Backend
-
 ---
 
 ## 🚀 Demos
