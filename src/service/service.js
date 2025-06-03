@@ -180,6 +180,8 @@ export const getSubsPerEvent = () =>
 export const getAvgStars = () => handleRequest(() => api.get("/avgstars"));
 export const getFeedbacksByEventId = (eventId) =>
   handleRequest(() => api.get(`/feedbacks/event/${eventId}`));
+export const getListEventTracks = () =>
+  handleRequest(() => api.get("/list-event-track"));
 
 //-------------------------------------------------USER EVENTS-------------------------------------
 // Add event to user's events

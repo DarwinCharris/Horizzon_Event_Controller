@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   TextInput,
@@ -9,10 +9,15 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Image,
+  Modal,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import ImageUriPicker from "./uir";
-import { createEvent } from "../../service/service";
+import { createEvent, getListEventTracks } from "../../service/service";
 
 const CreateEventForm = ({ route }) => {
   const { refreshEvents, closeForm } = route.params || {};
@@ -23,72 +28,31 @@ const CreateEventForm = ({ route }) => {
     name: "",
     description: "",
     longDescription: "",
-    start: "",
-    end: "",
+    start: null,
+    end: null,
     location: "",
     capacity: "",
     seats: "",
   });
 
+  const [eventTracks, setEventTracks] = useState([]);
   const [speakers, setSpeakers] = useState([""]);
   const [coverUri, setCoverUri] = useState(null);
   const [cardUri, setCardUri] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [trackModalVisible, setTrackModalVisible] = useState(false);
 
-  const validateForm = () => {
-    const errors = {};
-    const requiredFields = [
-      "trackId",
-      "eventTrackName",
-      "name",
-      "description",
-      "longDescription",
-      "start",
-      "end",
-      "location",
-      "capacity",
-      "seats",
-    ];
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
-    requiredFields.forEach((field) => {
-      if (!form[field]?.trim()) {
-        errors[field] = "Este campo es requerido";
-      }
-    });
-
-    if (isNaN(form.capacity) || form.capacity <= 0) {
-      errors.capacity = "Capacidad debe ser número positivo";
-    }
-
-    if (isNaN(form.seats) || form.seats <= 0) {
-      errors.seats = "Asientos debe ser número positivo";
-    }
-
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(form.start)) {
-      errors.start = "Formato debe ser YYYY-MM-DD";
-    }
-
-    if (!dateRegex.test(form.end)) {
-      errors.end = "Formato debe ser YYYY-MM-DD";
-    }
-
-    if (new Date(form.start) > new Date(form.end)) {
-      errors.end = "Fecha fin no puede ser anterior a fecha inicio";
-    }
-
-    if (!coverUri) {
-      errors.coverUri = "Imagen de portada requerida";
-    }
-
-    if (!cardUri) {
-      errors.cardUri = "Imagen de tarjeta requerida";
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  useEffect(() => {
+    const fetchTracks = async () => {
+      const result = await getListEventTracks();
+      if (result.success) setEventTracks(result.data);
+    };
+    fetchTracks();
+  }, []);
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -97,288 +61,338 @@ const CreateEventForm = ({ route }) => {
     }
   };
 
-  const handleSpeakerChange = (index, value) => {
-    const updated = [...speakers];
-    updated[index] = value;
-    setSpeakers(updated);
+  const handleTrackSelection = (id, name) => {
+    setForm((prev) => ({
+      ...prev,
+      trackId: parseInt(id), // 🔁 como entero
+      eventTrackName: name,
+    }));
   };
 
-  const addSpeaker = () => {
-    setSpeakers([...speakers, ""]);
-  };
-
-  const removeSpeaker = (index) => {
-    if (speakers.length > 1) {
-      const updated = speakers.filter((_, i) => i !== index);
-      setSpeakers(updated);
-    }
-  };
-
-  const formatDateForAPI = (dateString) => {
-    const [year, month, day] = dateString.split("-");
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  const formatDateTime = (date) => {
+    if (!date) return "";
+    return date.toLocaleString(); // Ej: 2/6/2025, 16:30
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    if (!form.trackId) {
+      Alert.alert("Error", "Por favor, selecciona una línea de evento");
+      return;
+    }
 
     try {
       setLoading(true);
 
       const eventData = {
-        eventTrackId: form.trackId,
+        trackId: parseInt(form.trackId),
         eventTrackName: form.eventTrackName,
         name: form.name,
         description: form.description,
         longDescription: form.longDescription,
-        initialDate: formatDateForAPI(form.start),
-        finalDate: formatDateForAPI(form.end),
+        start: form.start?.toISOString(),
+        end: form.end?.toISOString(),
         location: form.location,
         capacity: parseInt(form.capacity),
-        availableSeats: parseInt(form.seats),
-        speakers: speakers.filter((name) => name.trim() !== ""),
+        seats: parseInt(form.seats),
+        speakers: speakers.filter((s) => s.trim() !== ""),
         coverPath: coverUri,
         cardPath: cardUri,
       };
-
-      console.log("Datos a enviar:", JSON.stringify(eventData, null, 2));
-
+      print("Event Data:", eventData.end);
       const response = await createEvent(eventData);
-
-      if (!response.success) {
-        throw new Error(response.error || "Error al crear evento");
-      }
+      if (!response.success) throw new Error(response.error);
 
       Alert.alert("Éxito", "Evento creado correctamente");
-
-      if (refreshEvents) refreshEvents();
-      if (closeForm) closeForm();
+      refreshEvents?.();
+      closeForm?.();
     } catch (error) {
-      console.error("Error detallado:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.message ||
-          error.message ||
-          "Error al conectar con el servidor"
-      );
+      Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      {/* Botón de cerrar con ícono X */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={closeForm}>
-          <Ionicons name="close" size={28} color="#333" />
-        </TouchableOpacity>
+    <View style={styles.wrapper}>
+      <View style={styles.topbar}>
+        <StatusBar backgroundColor="#8BD5FC" barStyle="dark-content" />
+        <View style={styles.topbarContent}>
+          <Text style={styles.topbarTitle}>Crear Evento</Text>
+          <TouchableOpacity onPress={closeForm}>
+            <Ionicons name="close" size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.sectionTitle}>Información Básica</Text>
+      <ScrollView style={styles.container}>
+        <Text style={styles.sectionTitle}>Línea de evento asociado</Text>
+        <TouchableOpacity
+          style={styles.dropdown}
+          onPress={() => setTrackModalVisible(true)}
+        >
+          <Text
+            style={
+              form.trackId ? styles.dropdownText : styles.dropdownPlaceholder
+            }
+          >
+            {form.trackId ? form.eventTrackName : "Seleccionar línea de evento"}
+          </Text>
+        </TouchableOpacity>
 
-        {[
-          ["trackId", "ID del Track (eventTrackId)"],
-          ["eventTrackName", "Nombre del Track"],
-          ["name", "Nombre del Evento*"],
-          ["description", "Descripción corta*"],
-          ["longDescription", "Descripción larga*"],
-        ].map(([key, placeholder]) => (
-          <View key={key}>
-            <TextInput
-              placeholder={placeholder}
-              value={form[key]}
-              onChangeText={(text) => handleChange(key, text)}
-              style={[styles.input, formErrors[key] && styles.inputError]}
-              multiline={key.includes("Description")}
-            />
-            {formErrors[key] && (
-              <Text style={styles.errorText}>{formErrors[key]}</Text>
-            )}
-          </View>
-        ))}
-
-        <Text style={styles.sectionTitle}>Fechas y Ubicación</Text>
-
-        {[
-          ["start", "Fecha inicio (YYYY-MM-DD)*"],
-          ["end", "Fecha fin (YYYY-MM-DD)*"],
-          ["location", "Ubicación*"],
-        ].map(([key, placeholder]) => (
-          <View key={key}>
-            <TextInput
-              placeholder={placeholder}
-              value={form[key]}
-              onChangeText={(text) => handleChange(key, text)}
-              style={[styles.input, formErrors[key] && styles.inputError]}
-            />
-            {formErrors[key] && (
-              <Text style={styles.errorText}>{formErrors[key]}</Text>
-            )}
-          </View>
-        ))}
-
-        <Text style={styles.sectionTitle}>Capacidad</Text>
-
-        {[
-          ["capacity", "Capacidad total*"],
-          ["seats", "Asientos disponibles*"],
-        ].map(([key, placeholder]) => (
-          <View key={key}>
-            <TextInput
-              placeholder={placeholder}
-              value={form[key]}
-              onChangeText={(text) =>
-                handleChange(key, text.replace(/[^0-9]/g, ""))
-              }
-              style={[styles.input, formErrors[key] && styles.inputError]}
-              keyboardType="numeric"
-            />
-            {formErrors[key] && (
-              <Text style={styles.errorText}>{formErrors[key]}</Text>
-            )}
-          </View>
-        ))}
-
-        <Text style={styles.sectionTitle}>Speakers</Text>
-        {speakers.map((name, index) => (
-          <View key={index} style={styles.speakerItem}>
-            <View style={styles.speakerInputContainer}>
-              <TextInput
-                placeholder={`Nombre del speaker ${index + 1}`}
-                value={name}
-                onChangeText={(text) => handleSpeakerChange(index, text)}
-                style={styles.speakerInput}
+        <Modal
+          visible={trackModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setTrackModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <ScrollView>
+                {eventTracks.map((track) => (
+                  <TouchableOpacity
+                    key={track.id}
+                    onPress={() => {
+                      handleTrackSelection(track.id, track.name);
+                      setTrackModalVisible(false);
+                    }}
+                    style={styles.modalOption}
+                  >
+                    <Text>{track.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Button
+                title="Cancelar"
+                onPress={() => setTrackModalVisible(false)}
               />
             </View>
-            {speakers.length > 1 && (
-              <View style={styles.removeButton}>
-                <Button
-                  title="Eliminar"
-                  onPress={() => removeSpeaker(index)}
-                  color="#ff4444"
-                />
-              </View>
-            )}
           </View>
+        </Modal>
+
+        <Text style={styles.sectionTitle}>Nombre del Evento</Text>
+        <TextInput
+          style={styles.input}
+          value={form.name}
+          onChangeText={(t) => handleChange("name", t)}
+          placeholder="Nombre del Evento"
+        />
+
+        <Text style={styles.sectionTitle}>Descripción corta</Text>
+        <TextInput
+          style={styles.input}
+          value={form.description}
+          onChangeText={(t) => handleChange("description", t)}
+          placeholder="Descripción corta"
+        />
+
+        <Text style={styles.sectionTitle}>Descripción larga</Text>
+        <TextInput
+          style={styles.input}
+          value={form.longDescription}
+          onChangeText={(t) => handleChange("longDescription", t)}
+          placeholder="Descripción larga"
+          multiline
+        />
+
+        <Text style={styles.sectionTitle}>Fechas y lugar</Text>
+
+        <Text style={styles.subLabel}>Fecha y hora de inicio</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowStartPicker(true)}
+        >
+          <Text>
+            {formatDateTime(form.start) || "Seleccionar fecha de inicio"}
+          </Text>
+        </TouchableOpacity>
+        {showStartPicker && (
+          <DateTimePicker
+            value={form.start || new Date()}
+            mode="datetime"
+            is24Hour={true}
+            display="default"
+            onChange={(_, date) => {
+              setShowStartPicker(Platform.OS === "ios");
+              if (date) handleChange("start", date);
+            }}
+          />
+        )}
+
+        <Text style={styles.subLabel}>Fecha y hora de fin</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowEndPicker(true)}
+        >
+          <Text>{formatDateTime(form.end) || "Seleccionar fecha de fin"}</Text>
+        </TouchableOpacity>
+        {showEndPicker && (
+          <DateTimePicker
+            value={form.end || new Date()}
+            mode="datetime"
+            is24Hour={true}
+            display="default"
+            onChange={(_, date) => {
+              setShowEndPicker(Platform.OS === "ios");
+              if (date) handleChange("end", date);
+            }}
+          />
+        )}
+
+        <Text style={styles.subLabel}>Ubicación</Text>
+        <TextInput
+          style={styles.input}
+          value={form.location}
+          onChangeText={(t) => handleChange("location", t)}
+          placeholder="Ubicación"
+        />
+
+        <Text style={styles.sectionTitle}>Capacidad</Text>
+        <TextInput
+          style={styles.input}
+          value={form.capacity}
+          onChangeText={(t) => handleChange("capacity", t)}
+          placeholder="Capacidad"
+          keyboardType="numeric"
+        />
+        <TextInput
+          style={styles.input}
+          value={form.seats}
+          onChangeText={(t) => handleChange("seats", t)}
+          placeholder="Asientos disponibles"
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.sectionTitle}>Speakers</Text>
+        {speakers.map((sp, i) => (
+          <TextInput
+            key={i}
+            style={styles.input}
+            value={sp}
+            onChangeText={(t) => {
+              const updated = [...speakers];
+              updated[i] = t;
+              setSpeakers(updated);
+            }}
+            placeholder={`Speaker ${i + 1}`}
+          />
         ))}
-        <View style={styles.addButton}>
-          <Button
-            title="Agregar otro speaker"
-            onPress={addSpeaker}
-            color="#4285f4"
-          />
-        </View>
+        <Button
+          title="Agregar speaker"
+          onPress={() => setSpeakers([...speakers, ""])}
+        />
 
-        <Text style={styles.sectionTitle}>Imágenes</Text>
-
-        <Text style={styles.label}>Portada del Evento*</Text>
+        <Text style={styles.sectionTitle}>Portada del evento</Text>
         <ImageUriPicker onUriPicked={setCoverUri} currentUri={coverUri} />
-        {formErrors.coverUri && (
-          <Text style={styles.errorText}>{formErrors.coverUri}</Text>
+        {coverUri && (
+          <Image source={{ uri: coverUri }} style={styles.imagePreview} />
         )}
 
-        <Text style={styles.label}>Imagen de Tarjeta*</Text>
+        <Text style={styles.sectionTitle}>Imagen de tarjeta</Text>
         <ImageUriPicker onUriPicked={setCardUri} currentUri={cardUri} />
-        {formErrors.cardUri && (
-          <Text style={styles.errorText}>{formErrors.cardUri}</Text>
+        {cardUri && (
+          <Image source={{ uri: cardUri }} style={styles.imagePreview} />
         )}
 
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#4285f4"
-            style={styles.loader}
-          />
-        ) : (
-          <View style={styles.submitButton}>
+        <View style={styles.submitContainer}>
+          {loading ? (
+            <ActivityIndicator size="large" color="#4285f4" />
+          ) : (
             <Button
               title="Crear Evento"
               onPress={handleSubmit}
               color="#4285f4"
-              disabled={loading}
             />
-          </View>
-        )}
+          )}
+        </View>
       </ScrollView>
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    paddingBottom: 40,
+  wrapper: {
+    flex: 1,
+    backgroundColor: "#fff",
   },
-  topBar: {
-    marginTop: 40,
-    marginRight: 20,
-    alignItems: "flex-end",
+  topbar: {
+    backgroundColor: "#8BD5FC",
+    paddingTop: StatusBar.currentHeight || 40,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
-  sectionTitle: {
+  topbarContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  topbarTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    marginTop: 20,
-    marginBottom: 10,
-    color: "#4285f4",
+    color: "#000",
+  },
+  container: {
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginVertical: 10,
+  },
+  subLabel: {
+    fontSize: 14,
+    marginTop: 10,
+    marginBottom: 4,
+    color: "#555",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#ccc",
     padding: 12,
-    marginBottom: 15,
+    marginBottom: 12,
     borderRadius: 6,
-    fontSize: 16,
   },
-  inputError: {
-    borderColor: "#ff4444",
-    backgroundColor: "#fff9f9",
-  },
-  errorText: {
-    color: "#ff4444",
-    marginTop: -10,
-    marginBottom: 15,
-    fontSize: 14,
-  },
-  speakerItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    padding: 10,
-  },
-  speakerInputContainer: {
-    flex: 1,
-    marginRight: 10,
-  },
-  speakerInput: {
+  dropdown: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
+    borderColor: "#ccc",
+    padding: 12,
     borderRadius: 6,
+    marginBottom: 12,
+  },
+  dropdownText: {
     fontSize: 16,
-    backgroundColor: "white",
+    color: "#333",
   },
-  removeButton: {
-    width: 90,
+  dropdownPlaceholder: {
+    fontSize: 16,
+    color: "#aaa",
   },
-  addButton: {
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    margin: 20,
+    padding: 20,
+    borderRadius: 10,
+    maxHeight: "70%",
+  },
+  modalOption: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  imagePreview: {
+    width: "100%",
+    height: 200,
     marginTop: 10,
     marginBottom: 20,
+    borderRadius: 8,
   },
-  label: {
-    marginBottom: 8,
-    fontWeight: "600",
-    color: "#555",
-  },
-  submitButton: {
+  submitContainer: {
     marginTop: 30,
-    marginBottom: 20,
-  },
-  loader: {
-    marginVertical: 30,
+    marginBottom: 60,
   },
 });
 

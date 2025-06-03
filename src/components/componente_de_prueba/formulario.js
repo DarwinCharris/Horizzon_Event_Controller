@@ -1,6 +1,14 @@
-// CreateEventTrackForm.js
 import React, { useState } from "react";
-import { View, TextInput, Button, StyleSheet, Text, Alert } from "react-native";
+import {
+  View,
+  TextInput,
+  Button,
+  StyleSheet,
+  Text,
+  Alert,
+  Image,
+  ScrollView,
+} from "react-native";
 import ImageUriPicker from "./uir";
 import { createEventTrack } from "../../service/service";
 
@@ -21,7 +29,8 @@ const CreateEventTrackForm = () => {
       setLoading(true);
       await createEventTrack(name, description, coverUri, overlayUri);
       Alert.alert("Éxito", "Evento creado correctamente");
-      // Opcional: limpiar estado
+
+      // Limpiar formulario
       setName("");
       setDescription("");
       setCoverUri(null);
@@ -35,13 +44,16 @@ const CreateEventTrackForm = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.label}>Nombre del evento:</Text>
       <TextInput
         placeholder="Nombre del evento"
         value={name}
         onChangeText={setName}
         style={styles.input}
       />
+
+      <Text style={styles.label}>Descripción:</Text>
       <TextInput
         placeholder="Descripción"
         value={description}
@@ -52,23 +64,31 @@ const CreateEventTrackForm = () => {
 
       <Text style={styles.label}>Selecciona imagen de portada:</Text>
       <ImageUriPicker onUriPicked={setCoverUri} />
+      {coverUri && (
+        <Image source={{ uri: coverUri }} style={styles.imagePreview} />
+      )}
 
-      <Text style={styles.label}>Selecciona imagen de overlay:</Text>
+      <Text style={styles.label}>Selecciona imagen secundaria (overlay):</Text>
       <ImageUriPicker onUriPicked={setOverlayUri} />
+      {overlayUri && (
+        <Image source={{ uri: overlayUri }} style={styles.imagePreview} />
+      )}
 
-      <Button
-        title={loading ? "Creando..." : "Crear Evento"}
-        onPress={handleCreateEvent}
-        disabled={loading}
-      />
-    </View>
+      <View style={styles.submitContainer}>
+        <Button
+          title={loading ? "Creando..." : "Crear Evento"}
+          onPress={handleCreateEvent}
+          disabled={loading}
+        />
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    flex: 1,
+    paddingBottom: 60,
   },
   input: {
     borderColor: "#ccc",
@@ -81,6 +101,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 5,
     fontWeight: "bold",
+    fontSize: 14,
+  },
+  imagePreview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 8,
+    marginVertical: 10,
+  },
+  submitContainer: {
+    marginTop: 20,
   },
 });
 
